@@ -479,13 +479,29 @@ const getHTML = () => `
 `;
 
 // --- SERVER HANDLER ---
+// --- UBAH BAGIAN SERVER HANDLER ---
 const server = http.createServer((req, res) => {
+    // Parsing URL
     const url = new URL(req.url, `http://localhost:${PORT}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     
+    // 1. ROUTE UNTUK HALAMAN UTAMA (HTML)
     if (url.pathname === '/' || url.pathname === '/index.html') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(getHTML());
+        // Hapus <style>...</style> dari getHTML() dan ganti dengan:
+        // <link rel="stylesheet" href="/style.css">
+        res.end(getHTML()); 
+    }
+    // 2. ROUTE BARU UNTUK STYLE.CSS
+    else if (url.pathname === '/style.css') {
+        try {
+            const cssContent = fs.readFileSync(path.join(__dirname, 'style.css'));
+            res.writeHead(200, { 'Content-Type': 'text/css' });
+            res.end(cssContent);
+        } catch (e) {
+            res.writeHead(404);
+            res.end("CSS Not Found");
+        }
     }
     else if (url.pathname === '/api/status') {
         res.writeHead(200, { 'Content-Type': 'application/json' });

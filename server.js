@@ -531,28 +531,35 @@ const server = http.createServer((req, res) => {
 
 process.on('SIGINT', () => { activeBots.forEach(c => c.kill()); process.exit(0); });
 
-// Pastikan ini ada di paling atas
-
-// ... (kode lainnya tetap sama) ...
-
-server.listen(PORT, '0.0.0.0', async () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n✅ Local Server: http://localhost:${PORT}`);
-    console.log('⏳ Requesting Custom URL via Localtunnel...');
+    console.log('⏳ Menghubungkan ke Cloudflare Quick Tunnel...');
+    console.log('   (Ini solusi paling cepat & anti-blokir untuk Termux)');
 
-    try {
-        // GANTI 'nama-bebas-disini' dengan nama yang kamu mau
-        const tunnel = await localtunnel({ 
-            port: PORT,
-            subdomain: 'monitor-wa-v1' 
-        });
+    // Menjalankan Cloudflared
+    const tunnel = spawn('cloudflared', [
+        'tunnel', 
+        '--url', `http://localhost:${PORT}`,
+        '--logfile', 'cloudflared.log' // Supaya log bersih
+    ]);
 
-        console.log(`\n🚀 LINK DASHBOARD BERHASIL:`);
-        console.log(`👉 ${tunnel.url}`);
+    // Cloudflared mengeluarkan link lewat stderr
+    tunnel.stderr.on('data', (data) => {
+        const output = data.toString();
+        // Mencari link trycloudflare.com
+        const urlMatch = output.match(/https:\/\/[\w-]+\.trycloudflare\.com/);
+        
+        if (urlMatch) {
+            console.log(`\n🚀 LINK DASHBOARD BERHASIL:`);
+            console.log(`👉 ${urlMatch[0]}`);
+            console.log(`\n(Gunakan link ini di browser HP lain untuk monitoring)`);
+        }
+    });
 
-        tunnel.on('close', () => {
-            console.log('Tunnel terputus.');
-        });
-    } catch (err) {
-        console.error('Gagal membuat tunnel:', err);
-    }
+    tunnel.on('close', (code) => {
+        console.log(`Cloudflared berhenti (Code: ${code})`);
+    });
+    
+    // Matikan cloudflared jika bot dimatikan
+    process.on('exit', () => tunnel.kill());
 });

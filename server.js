@@ -41,13 +41,18 @@ const startBotProcess = (sessionName) => {
                 if (logs.length > 100) logs.shift();
                 
                 if (line.includes('KODE PAIRING')) {
-                    const match = line.match(/KODE PAIRING.*?:\s*([\d-]+)/);
-                    if (match) {
-                        pairingCodes.set(sessionName, match[1]);
+                    const parts = line.split(':');
+                    if (parts.length >= 2) {
+                        const code = parts[parts.length - 1].trim();
+                        if (code) {
+                            pairingCodes.set(sessionName, code);
+                            console.log(`[PAIRING] ${sessionName}: ${code}`);
+                        }
                     }
                 }
                 if (line.includes('TERHUBUNG')) {
                     pairingCodes.set(sessionName, 'CONNECTED');
+                    console.log(`[CONNECTED] ${sessionName}`);
                 }
             }
         });

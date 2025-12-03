@@ -30,11 +30,16 @@ const {
 
 const pino = require("pino");
 const http = require("http");
+const https = require("https");
 
 // =================== CONFIG ===================
 const config = {
     downloadPath: "./downloads",
+    uptimeUrl: process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS || null,
 };
+
+// Random Keep-Alive Interval (8000-12000ms) agar tidak bertabrakan antar bot
+const getRandomKeepAlive = () => Math.floor(8000 + Math.random() * 4000);
 
 if (!fs.existsSync(config.downloadPath)) fs.mkdirSync(config.downloadPath, { recursive: true });
 
@@ -50,6 +55,9 @@ async function startBot(sessionPhone) {
     const { version } = await fetchLatestBaileysVersion();
 
     // 2. Setup Socket (Konfigurasi Stabil Anti-Loop)
+    const randomKeepAlive = getRandomKeepAlive();
+    console.log(`🔄 Keep-Alive Interval: ${randomKeepAlive}ms`);
+    
     const sock = makeWASocket({
         version,
         logger: pino({ level: "silent" }),
@@ -60,7 +68,7 @@ async function startBot(sessionPhone) {
         },
         browser: Browsers.macOS("Chrome"), // Identitas Browser Stabil
         connectTimeoutMs: 60000,
-        keepAliveIntervalMs: 10000,
+        keepAliveIntervalMs: randomKeepAlive, // Random interval agar tidak bertabrakan
         emitOwnEvents: true,
         fireInitQueries: true,
         generateHighQualityLinkPreview: true,
@@ -227,9 +235,38 @@ async function startBot(sessionPhone) {
 const httpServer = http.createServer((req, res) => { res.writeHead(200); res.end('Active'); });
 httpServer.listen(0);
 
+// Uptime HTTPS Ping setiap 1 menit
+const startUptimePing = (sessionPhone) => {
+    if (!config.uptimeUrl) {
+        console.log(`⚠️ [${sessionPhone}] Uptime URL tidak ditemukan, skip ping.`);
+        return;
+    }
+    
+    const pingUrl = `https://${config.uptimeUrl}`;
+    const randomOffset = Math.floor(Math.random() * 10000); // Random 0-10 detik agar tidak bertabrakan
+    
+    console.log(`🌐 [${sessionPhone}] Uptime ping dimulai (offset: ${randomOffset}ms)`);
+    
+    setTimeout(() => {
+        const doPing = () => {
+            https.get(pingUrl, (res) => {
+                console.log(`✅ [${sessionPhone}] Uptime ping: ${res.statusCode} - ${getWIBTime()}`);
+            }).on('error', (err) => {
+                console.log(`❌ [${sessionPhone}] Uptime ping error: ${err.message}`);
+            });
+        };
+        
+        doPing(); // Ping pertama
+        setInterval(doPing, 60000); // Ping setiap 1 menit
+    }, randomOffset);
+};
+
 // Argument Handler
 (async () => {
     const targetPhone = process.argv[2]; 
     if (!targetPhone) process.exit(1);
-    try { await startBot(targetPhone); } catch (e) { console.error(e); }
+    try { 
+        await startBot(targetPhone); 
+        startUptimePing(targetPhone); // Mulai uptime ping setelah bot jalan
+    } catch (e) { console.error(e); }
 })();

@@ -29,7 +29,7 @@ const startBotProcess = (sessionName) => {
     }
 
     const child = spawn('node', ['bot.js', sessionName], {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
         shell: true
     });
 
@@ -492,6 +492,29 @@ const server = http.createServer((req, res) => {
         // <link rel="stylesheet" href="/style.css">
         res.end(getHTML()); 
     }
+    // ... API lain ...
+
+// API BARU: Kirim Pesan dari Web
+else if (url.pathname === '/api/send-message' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+        try {
+            const { session, jid, text } = JSON.parse(body);
+            const child = activeBots.get(session);
+            
+            if (child) {
+                // KIRIM DATA KE BOT.JS LEWAT JALUR IPC
+                child.send({ type: 'SEND_TEXT', jid, text });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Perintah dikirim ke bot' }));
+            } else {
+                res.writeHead(400); 
+                res.end(JSON.stringify({ success: false, message: 'Bot mati/tidak ada' }));
+            }
+        } catch (e) { res.writeHead(500); res.end(e.message); }
+    });
+}
     // 2. ROUTE BARU UNTUK STYLE.CSS
     else if (url.pathname === '/style.css') {
         try {

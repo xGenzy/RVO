@@ -7,11 +7,16 @@ const PORT = 5000;
 
 const activeBots = new Map();
 const botLogs = new Map();
+const pairingCodes = new Map();
 
 const getSessions = () => {
     return fs.readdirSync('./').filter(file => {
         return fs.statSync(file).isDirectory() && /^\d+$/.test(file);
     });
+};
+
+const getWIBTime = () => {
+    return new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
 };
 
 const startBotProcess = (sessionName) => {
@@ -32,8 +37,18 @@ const startBotProcess = (sessionName) => {
         const logs = botLogs.get(sessionName) || [];
         lines.forEach(line => {
             if (line.trim()) {
-                logs.push({ time: new Date().toLocaleTimeString('id-ID'), type: 'info', msg: line });
+                logs.push({ time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }), type: 'info', msg: line });
                 if (logs.length > 100) logs.shift();
+                
+                if (line.includes('KODE PAIRING')) {
+                    const match = line.match(/KODE PAIRING.*?:\s*([\d-]+)/);
+                    if (match) {
+                        pairingCodes.set(sessionName, match[1]);
+                    }
+                }
+                if (line.includes('TERHUBUNG')) {
+                    pairingCodes.set(sessionName, 'CONNECTED');
+                }
             }
         });
         botLogs.set(sessionName, logs);
@@ -41,14 +56,14 @@ const startBotProcess = (sessionName) => {
 
     child.stderr.on('data', (data) => {
         const logs = botLogs.get(sessionName) || [];
-        logs.push({ time: new Date().toLocaleTimeString('id-ID'), type: 'error', msg: data.toString().trim() });
+        logs.push({ time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }), type: 'error', msg: data.toString().trim() });
         if (logs.length > 100) logs.shift();
         botLogs.set(sessionName, logs);
     });
 
     child.on('close', (code) => {
         const logs = botLogs.get(sessionName) || [];
-        logs.push({ time: new Date().toLocaleTimeString('id-ID'), type: 'system', msg: `Bot berhenti (Code: ${code})` });
+        logs.push({ time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }), type: 'system', msg: `Bot berhenti (Code: ${code})` });
         botLogs.set(sessionName, logs);
         activeBots.delete(sessionName);
     });
@@ -79,6 +94,7 @@ const deleteSession = (sessionName) => {
     try {
         fs.rmSync(sessionPath, { recursive: true, force: true });
         botLogs.delete(sessionName);
+        pairingCodes.delete(sessionName);
         return { success: true, message: 'Session berhasil dihapus' };
     } catch (e) {
         return { success: false, message: 'Gagal menghapus: ' + e.message };
@@ -96,8 +112,30 @@ const addSession = (phoneNumber) => {
         return { success: false, message: 'Nomor sudah terdaftar' };
     }
     
+    pairingCodes.set(cleanPhone, 'WAITING');
     startBotProcess(cleanPhone);
     return { success: true, message: 'Memproses pairing...', phone: cleanPhone };
+};
+
+const startAllBots = () => {
+    const sessions = getSessions();
+    let started = 0;
+    sessions.forEach(session => {
+        if (!activeBots.has(session)) {
+            startBotProcess(session);
+            started++;
+        }
+    });
+    return { success: true, message: `${started} bot dimulai` };
+};
+
+const stopAllBots = () => {
+    const count = activeBots.size;
+    activeBots.forEach((child, session) => {
+        child.kill();
+    });
+    activeBots.clear();
+    return { success: true, message: `${count} bot dihentikan` };
 };
 
 const getHTML = () => `
@@ -132,11 +170,36 @@ const getHTML = () => `
         }
         .header p { color: #888; }
         
+        .clock {
+            background: rgba(0,217,255,0.1);
+            border: 1px solid rgba(0,217,255,0.3);
+            border-radius: 10px;
+            padding: 15px 25px;
+            display: inline-block;
+            margin-top: 15px;
+        }
+        .clock .time {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00d9ff;
+            font-family: 'Consolas', monospace;
+        }
+        .clock .date {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .clock .zone {
+            color: #00ff88;
+            font-size: 0.8em;
+        }
+        
         .actions-bar {
             display: flex;
             gap: 15px;
             margin-bottom: 25px;
             flex-wrap: wrap;
+            align-items: center;
         }
         .action-btn {
             padding: 12px 25px;
@@ -153,6 +216,16 @@ const getHTML = () => `
         .action-btn.add {
             background: linear-gradient(90deg, #00d9ff, #00ff88);
             color: #1a1a2e;
+        }
+        .action-btn.start-all {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+        .action-btn.stop-all {
+            background: rgba(255,100,100,0.2);
+            color: #ff6464;
+            border: 1px solid #ff6464;
         }
         .action-btn:hover { opacity: 0.85; transform: scale(1.02); }
         
@@ -229,7 +302,7 @@ const getHTML = () => `
         }
         
         .session-logs {
-            height: 180px;
+            height: 150px;
             overflow-y: auto;
             padding: 15px;
             background: rgba(0,0,0,0.3);
@@ -302,7 +375,7 @@ const getHTML = () => `
             border-radius: 20px;
             padding: 30px;
             width: 90%;
-            max-width: 450px;
+            max-width: 500px;
             border: 1px solid rgba(255,255,255,0.1);
         }
         .modal-header {
@@ -365,24 +438,54 @@ const getHTML = () => `
         .modal-btn:hover { opacity: 0.85; }
         .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        .pairing-code {
+        .pairing-box {
             text-align: center;
-            padding: 20px;
-            background: rgba(0,255,136,0.1);
-            border-radius: 10px;
+            padding: 25px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
             margin: 20px 0;
+            border: 2px dashed rgba(0,217,255,0.3);
         }
-        .pairing-code .code {
-            font-size: 2em;
+        .pairing-box .label {
+            color: #888;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .pairing-box .code {
+            font-size: 3em;
             font-weight: bold;
             color: #00ff88;
-            letter-spacing: 5px;
+            letter-spacing: 8px;
             font-family: 'Consolas', monospace;
+            text-shadow: 0 0 20px rgba(0,255,136,0.5);
         }
-        .pairing-code p {
+        .pairing-box .code.waiting {
+            color: #ffaa00;
+            font-size: 1.5em;
+            letter-spacing: 0;
+        }
+        .pairing-box .code.connected {
+            color: #00ff88;
+            font-size: 1.5em;
+            letter-spacing: 0;
+        }
+        .pairing-box .instruction {
+            color: #666;
+            margin-top: 20px;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+        .pairing-box .step {
+            background: rgba(255,255,255,0.05);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: left;
             color: #888;
-            margin-top: 10px;
-            font-size: 0.9em;
+        }
+        .pairing-box .step span {
+            color: #00d9ff;
+            font-weight: bold;
         }
         
         @keyframes pulse {
@@ -390,6 +493,12 @@ const getHTML = () => `
             50% { opacity: 0.5; }
         }
         .pulse { animation: pulse 2s infinite; }
+        
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 20px rgba(0,255,136,0.5); }
+            50% { text-shadow: 0 0 40px rgba(0,255,136,0.8); }
+        }
+        .glow { animation: glow 1.5s infinite; }
         
         .empty-state {
             text-align: center;
@@ -404,11 +513,22 @@ const getHTML = () => `
         <div class="header">
             <h1>WhatsApp Bot Monitor</h1>
             <p>Real-time monitoring dashboard</p>
+            <div class="clock">
+                <div class="time" id="clockTime">--:--:--</div>
+                <div class="date" id="clockDate">Loading...</div>
+                <div class="zone">WIB (Asia/Jakarta)</div>
+            </div>
         </div>
         
         <div class="actions-bar">
             <button class="action-btn add" onclick="showAddModal()">
                 <span>+</span> Tambah WhatsApp
+            </button>
+            <button class="action-btn start-all" onclick="startAll()">
+                Aktifkan Semua
+            </button>
+            <button class="action-btn stop-all" onclick="stopAll()">
+                Matikan Semua
             </button>
         </div>
         
@@ -469,6 +589,18 @@ const getHTML = () => `
     <script>
         const startTime = Date.now();
         let deleteTarget = null;
+        let currentPairingPhone = null;
+        let pairingInterval = null;
+        
+        function updateClock() {
+            const now = new Date();
+            const options = { timeZone: 'Asia/Jakarta' };
+            const timeStr = now.toLocaleTimeString('id-ID', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = now.toLocaleDateString('id-ID', { ...options, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            document.getElementById('clockTime').textContent = timeStr;
+            document.getElementById('clockDate').textContent = dateStr;
+        }
         
         function formatUptime(ms) {
             const seconds = Math.floor(ms / 1000);
@@ -547,9 +679,18 @@ const getHTML = () => `
             fetchStatus();
         }
         
+        async function startAll() {
+            await fetch('/api/start-all', { method: 'POST' });
+            fetchStatus();
+        }
+        
+        async function stopAll() {
+            await fetch('/api/stop-all', { method: 'POST' });
+            fetchStatus();
+        }
+        
         function showAddModal() {
             document.getElementById('addModal').classList.add('show');
-            document.getElementById('phoneInput').value = '';
             document.getElementById('addModalBody').innerHTML = \`
                 <div class="form-group">
                     <label>Nomor WhatsApp</label>
@@ -562,6 +703,11 @@ const getHTML = () => `
         
         function closeAddModal() {
             document.getElementById('addModal').classList.remove('show');
+            if (pairingInterval) {
+                clearInterval(pairingInterval);
+                pairingInterval = null;
+            }
+            currentPairingPhone = null;
         }
         
         async function addWhatsApp() {
@@ -579,42 +725,50 @@ const getHTML = () => `
             const data = await res.json();
             
             if (data.success) {
+                currentPairingPhone = data.phone;
+                
                 document.getElementById('addModalBody').innerHTML = \`
-                    <div class="pairing-code">
-                        <p style="color:#00d9ff;margin-bottom:15px">Menunggu Kode Pairing...</p>
-                        <div class="code pulse" id="pairingCode">----</div>
-                        <p>Masukkan kode ini di WhatsApp > Perangkat Tertaut > Tautkan Perangkat</p>
+                    <div class="pairing-box">
+                        <div class="label">KODE PAIRING WHATSAPP</div>
+                        <div class="code waiting pulse" id="pairingCode">Menunggu...</div>
+                        <div class="instruction">
+                            <div class="step"><span>1.</span> Buka WhatsApp di HP Anda</div>
+                            <div class="step"><span>2.</span> Ketuk Menu (titik 3) > Perangkat Tertaut</div>
+                            <div class="step"><span>3.</span> Ketuk "Tautkan Perangkat"</div>
+                            <div class="step"><span>4.</span> Masukkan kode di atas</div>
+                        </div>
                     </div>
-                    <p style="color:#888;font-size:0.9em;text-align:center">Kode akan muncul dalam beberapa detik. Cek juga di log session.</p>
-                    <button class="modal-btn" style="margin-top:20px;background:#333;color:#fff" onclick="closeAddModal()">Tutup</button>
+                    <button class="modal-btn" style="background:#333;color:#fff" onclick="closeAddModal()">Tutup</button>
                 \`;
                 
                 // Poll for pairing code
                 let attempts = 0;
-                const checkCode = setInterval(async () => {
+                pairingInterval = setInterval(async () => {
                     attempts++;
-                    const statusRes = await fetch('/api/status');
-                    const statusData = await statusRes.json();
-                    const logs = statusData.logs[data.phone] || [];
+                    try {
+                        const codeRes = await fetch('/api/pairing-code/' + currentPairingPhone);
+                        const codeData = await codeRes.json();
+                        
+                        const codeEl = document.getElementById('pairingCode');
+                        if (!codeEl) {
+                            clearInterval(pairingInterval);
+                            return;
+                        }
+                        
+                        if (codeData.code === 'CONNECTED') {
+                            codeEl.textContent = 'TERHUBUNG!';
+                            codeEl.className = 'code connected glow';
+                            clearInterval(pairingInterval);
+                        } else if (codeData.code && codeData.code !== 'WAITING') {
+                            codeEl.textContent = codeData.code;
+                            codeEl.className = 'code glow';
+                        }
+                    } catch (e) {}
                     
-                    for (const log of logs) {
-                        if (log.msg.includes('KODE PAIRING')) {
-                            const match = log.msg.match(/KODE PAIRING.*?:\\s*([\\d-]+)/);
-                            if (match) {
-                                document.getElementById('pairingCode').textContent = match[1];
-                                document.getElementById('pairingCode').classList.remove('pulse');
-                                clearInterval(checkCode);
-                            }
-                        }
-                        if (log.msg.includes('TERHUBUNG')) {
-                            document.getElementById('pairingCode').textContent = 'CONNECTED!';
-                            document.getElementById('pairingCode').style.color = '#00ff88';
-                            clearInterval(checkCode);
-                        }
+                    if (attempts > 60) {
+                        clearInterval(pairingInterval);
                     }
-                    
-                    if (attempts > 30) clearInterval(checkCode);
-                }, 2000);
+                }, 1500);
                 
                 fetchStatus();
             } else {
@@ -647,6 +801,9 @@ const getHTML = () => `
             }
         }
         
+        updateClock();
+        setInterval(updateClock, 1000);
+        
         fetchStatus();
         setInterval(fetchStatus, 3000);
     </script>
@@ -669,8 +826,15 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({
             sessions: getSessions(),
             activeBots: Array.from(activeBots.keys()),
-            logs: Object.fromEntries(botLogs)
+            logs: Object.fromEntries(botLogs),
+            serverTime: getWIBTime()
         }));
+    }
+    else if (url.pathname.startsWith('/api/pairing-code/')) {
+        const phone = url.pathname.split('/')[3];
+        const code = pairingCodes.get(phone) || null;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ code }));
     }
     else if (url.pathname.startsWith('/api/start/') && req.method === 'POST') {
         const session = url.pathname.split('/')[3];
@@ -681,6 +845,16 @@ const server = http.createServer((req, res) => {
     else if (url.pathname.startsWith('/api/stop/') && req.method === 'POST') {
         const session = url.pathname.split('/')[3];
         const result = stopBotProcess(session);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+    }
+    else if (url.pathname === '/api/start-all' && req.method === 'POST') {
+        const result = startAllBots();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+    }
+    else if (url.pathname === '/api/stop-all' && req.method === 'POST') {
+        const result = stopAllBots();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
     }

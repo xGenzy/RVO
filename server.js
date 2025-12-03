@@ -35,23 +35,25 @@ const startBotProcess = (sessionName) => {
 
     activeBots.set(sessionName, child);
     botLogs.set(sessionName, []);
-
     child.stdout.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         const logs = botLogs.get(sessionName) || [];
+        
         lines.forEach(line => {
             if (line.trim()) {
-                logs.push({ time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }), type: 'info', msg: line });
+                // --- TAMBAHAN BARIS INI UNTUK DEBUG DI TERMINAL ---
+                console.log(`[BOT SAYS]: ${line}`); 
+                // --------------------------------------------------
+
+                logs.push({ time: new Date().toLocaleTimeString('id-ID'), type: 'info', msg: line });
                 if (logs.length > 100) logs.shift();
                 
+                // PASTIKAN KEYWORDNYA SAMA PERSIS DENGAN DI BOT.JS
                 if (line.includes('KODE PAIRING')) {
                     const parts = line.split(':');
-                    if (parts.length >= 2) {
-                        const code = parts[parts.length - 1].trim();
-                        if (code) {
-                            pairingCodes.set(sessionName, code);
-                        }
-                    }
+                    // Ambil bagian terakhir setelah titik dua
+                    const code = parts[parts.length - 1].trim(); 
+                    pairingCodes.set(sessionName, code);
                 }
                 if (line.includes('TERHUBUNG')) {
                     pairingCodes.set(sessionName, 'CONNECTED');
@@ -60,7 +62,7 @@ const startBotProcess = (sessionName) => {
         });
         botLogs.set(sessionName, logs);
     });
-
+        
     child.stderr.on('data', (data) => {
         const logs = botLogs.get(sessionName) || [];
         logs.push({ time: new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }), type: 'error', msg: data.toString().trim() });

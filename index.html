@@ -229,53 +229,69 @@
 
         async function submitAddBot() {
             let phone = document.getElementById('phoneInput').value;
-            // Hapus karakter selain angka
+            
+            // 1. Bersihkan nomor (Hapus spasi, strip, dll)
             phone = phone.replace(/\D/g, ''); 
 
-            if (!phone) return alert('Masukkan Nomor!');
-            if (phone.length < 10) return alert('Nomor terlalu pendek!');
+            // 2. Validasi Input
+            if (!phone) {
+                alert('Nomor tidak boleh kosong!');
+                return;
+            }
+            
+            // Ubah tombol jadi Loading agar user tahu sedang proses
+            const btn = document.querySelector('#step1 .btn-green');
+            const originalText = btn.innerText;
+            btn.innerText = "PROSES...";
+            btn.disabled = true;
 
-            // Request Add Session
-            const res = await fetch('/api/add', { 
-                method: 'POST', 
-                body: JSON.stringify({ phone }) 
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                document.getElementById('step1').classList.add('hidden');
-                document.getElementById('step2').classList.remove('hidden');
+            try {
+                // 3. Kirim ke Server
+                const res = await fetch('/api/add', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ phone }),
+                    headers: { 'Content-Type': 'application/json' } // Penting!
+                });
                 
-                // Mulai Polling Kode Pairing
-                let attempts = 0;
-                pairingInterval = setInterval(async () => {
-                    attempts++;
-                    const cRes = await fetch('/api/pairing-code/' + data.phone);
-                    const cData = await cRes.json();
-                    
-                    if (cData.code && cData.code !== 'WAITING') {
-                        document.getElementById('pairingCodeDisplay').innerText = cData.code === 'CONNECTED' ? 'BERHASIL TERHUBUNG!' : cData.code;
-                        
-                        if(cData.code === 'CONNECTED') { 
-                            clearInterval(pairingInterval); 
-                            setTimeout(closeAddModal, 2000); 
-                            fetchStatus(); 
-                        }
-                    } else {
-                        // Animasi loading sederhana
-                        const dots = ".".repeat((attempts % 4));
-                        document.getElementById('pairingCodeDisplay').innerText = "MENUNGGU" + dots;
-                    }
+                // Cek jika server error (misal 404 atau 500)
+                if (!res.ok) throw new Error("Gagal menghubungi server");
 
-                    // Timeout setelah 60 detik
-                    if (attempts > 30) {
-                        clearInterval(pairingInterval);
-                        document.getElementById('pairingCodeDisplay').innerText = "TIMEOUT (Coba Lagi)";
-                        document.getElementById('pairingCodeDisplay').style.color = "var(--red)";
-                    }
-                }, 2000);
-            } else {
-                alert(data.message);
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+                    
+                    // Mulai Cek Kode
+                    let attempts = 0;
+                    pairingInterval = setInterval(async () => {
+                        attempts++;
+                        try {
+                            const cRes = await fetch('/api/pairing-code/' + data.phone);
+                            const cData = await cRes.json();
+                            
+                            if (cData.code && cData.code !== 'WAITING') {
+                                document.getElementById('pairingCodeDisplay').innerText = cData.code === 'CONNECTED' ? 'BERHASIL' : cData.code;
+                                if(cData.code === 'CONNECTED') { 
+                                    clearInterval(pairingInterval); 
+                                    setTimeout(closeAddModal, 2000); 
+                                    fetchStatus(); 
+                                }
+                            }
+                        } catch (err) {
+                            console.log("Menunggu kode...");
+                        }
+                    }, 2000);
+                } else {
+                    alert('Gagal: ' + data.message);
+                }
+            } catch (e) {
+                alert('Error: Pastikan Server (node server.js) sudah jalan!');
+                console.error(e);
+            } finally {
+                // Kembalikan tombol seperti semula
+                btn.innerText = originalText;
+                btn.disabled = false;
             }
         }
 

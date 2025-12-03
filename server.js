@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
-//const localtunnel = require('localtunnel'); 
+const localtunnel = require('localtunnel'); 
 const crypto = require('crypto');
 
 const PORT = 5000;
@@ -531,37 +531,28 @@ const server = http.createServer((req, res) => {
 
 process.on('SIGINT', () => { activeBots.forEach(c => c.kill()); process.exit(0); });
 
-// ... (kode atas biarkan sama)
+// Pastikan ini ada di paling atas
 
-server.listen(PORT, '0.0.0.0', () => {
+// ... (kode lainnya tetap sama) ...
+
+server.listen(PORT, '0.0.0.0', async () => {
     console.log(`\n✅ Local Server: http://localhost:${PORT}`);
-    console.log('⏳ Menghubungkan ke Cloudflare Quick Tunnel...');
-    console.log('   (Ini solusi paling cepat & anti-blokir untuk Termux)');
+    console.log('⏳ Requesting Custom URL via Localtunnel...');
 
-    // Menjalankan Cloudflared
-    const tunnel = spawn('cloudflared', [
-        'tunnel', 
-        '--url', `http://localhost:${PORT}`,
-        '--logfile', 'cloudflared.log' // Supaya log bersih
-    ]);
+    try {
+        // GANTI 'nama-bebas-disini' dengan nama yang kamu mau
+        const tunnel = await localtunnel({ 
+            port: PORT,
+            subdomain: 'monitor-wa-v1' 
+        });
 
-    // Cloudflared mengeluarkan link lewat stderr
-    tunnel.stderr.on('data', (data) => {
-        const output = data.toString();
-        // Mencari link trycloudflare.com
-        const urlMatch = output.match(/https:\/\/[\w-]+\.trycloudflare\.com/);
-        
-        if (urlMatch) {
-            console.log(`\n🚀 LINK DASHBOARD BERHASIL:`);
-            console.log(`👉 ${urlMatch[0]}`);
-            console.log(`\n(Gunakan link ini di browser HP lain untuk monitoring)`);
-        }
-    });
+        console.log(`\n🚀 LINK DASHBOARD BERHASIL:`);
+        console.log(`👉 ${tunnel.url}`);
 
-    tunnel.on('close', (code) => {
-        console.log(`Cloudflared berhenti (Code: ${code})`);
-    });
-    
-    // Matikan cloudflared jika bot dimatikan
-    process.on('exit', () => tunnel.kill());
+        tunnel.on('close', () => {
+            console.log('Tunnel terputus.');
+        });
+    } catch (err) {
+        console.error('Gagal membuat tunnel:', err);
+    }
 });

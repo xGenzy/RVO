@@ -66,6 +66,40 @@ const stopBotProcess = (sessionName) => {
     return { success: true, message: 'Bot dihentikan' };
 };
 
+const deleteSession = (sessionName) => {
+    if (activeBots.has(sessionName)) {
+        return { success: false, message: 'Bot sedang berjalan! Stop dulu sebelum menghapus.' };
+    }
+    
+    const sessionPath = `./${sessionName}`;
+    if (!fs.existsSync(sessionPath)) {
+        return { success: false, message: 'Session tidak ditemukan' };
+    }
+    
+    try {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+        botLogs.delete(sessionName);
+        return { success: true, message: 'Session berhasil dihapus' };
+    } catch (e) {
+        return { success: false, message: 'Gagal menghapus: ' + e.message };
+    }
+};
+
+const addSession = (phoneNumber) => {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    
+    if (cleanPhone.length < 10) {
+        return { success: false, message: 'Nomor tidak valid (minimal 10 digit)' };
+    }
+    
+    if (getSessions().includes(cleanPhone)) {
+        return { success: false, message: 'Nomor sudah terdaftar' };
+    }
+    
+    startBotProcess(cleanPhone);
+    return { success: true, message: 'Memproses pairing...', phone: cleanPhone };
+};
+
 const getHTML = () => `
 <!DOCTYPE html>
 <html lang="id">
@@ -97,6 +131,30 @@ const getHTML = () => `
             margin-bottom: 10px;
         }
         .header p { color: #888; }
+        
+        .actions-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .action-btn.add {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+        }
+        .action-btn:hover { opacity: 0.85; transform: scale(1.02); }
         
         .stats {
             display: flex;
@@ -171,7 +229,7 @@ const getHTML = () => `
         }
         
         .session-logs {
-            height: 200px;
+            height: 180px;
             overflow-y: auto;
             padding: 15px;
             background: rgba(0,0,0,0.3);
@@ -200,6 +258,7 @@ const getHTML = () => `
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
+            font-size: 0.9em;
         }
         .btn-start {
             background: linear-gradient(90deg, #00d9ff, #00ff88);
@@ -208,6 +267,11 @@ const getHTML = () => `
         .btn-stop {
             background: linear-gradient(90deg, #ff6464, #ff8888);
             color: #fff;
+        }
+        .btn-delete {
+            background: rgba(255,100,100,0.2);
+            color: #ff6464;
+            border: 1px solid #ff6464;
         }
         .btn:hover { opacity: 0.8; transform: scale(1.02); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -219,11 +283,120 @@ const getHTML = () => `
             font-size: 0.9em;
         }
         
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 30px;
+            width: 90%;
+            max-width: 450px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        .modal-header h2 {
+            color: #00d9ff;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .modal-close:hover { color: #fff; }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #888;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1.1em;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 8px;
+            color: #666;
+        }
+        
+        .modal-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+            transition: all 0.3s;
+        }
+        .modal-btn:hover { opacity: 0.85; }
+        .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .pairing-code {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,255,136,0.1);
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .pairing-code .code {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff88;
+            letter-spacing: 5px;
+            font-family: 'Consolas', monospace;
+        }
+        .pairing-code p {
+            color: #888;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
         .pulse { animation: pulse 2s infinite; }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state h3 { margin-bottom: 10px; color: #888; }
     </style>
 </head>
 <body>
@@ -231,6 +404,12 @@ const getHTML = () => `
         <div class="header">
             <h1>WhatsApp Bot Monitor</h1>
             <p>Real-time monitoring dashboard</p>
+        </div>
+        
+        <div class="actions-bar">
+            <button class="action-btn add" onclick="showAddModal()">
+                <span>+</span> Tambah WhatsApp
+            </button>
         </div>
         
         <div class="stats" id="stats">
@@ -253,8 +432,43 @@ const getHTML = () => `
         <p class="refresh-note pulse">Auto-refresh setiap 3 detik</p>
     </div>
     
+    <!-- Modal Tambah WhatsApp -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Tambah WhatsApp</h2>
+                <button class="modal-close" onclick="closeAddModal()">&times;</button>
+            </div>
+            <div id="addModalBody">
+                <div class="form-group">
+                    <label>Nomor WhatsApp</label>
+                    <input type="text" id="phoneInput" placeholder="628xxxxxxxxxx" />
+                    <small>Masukkan nomor dengan kode negara (tanpa +)</small>
+                </div>
+                <button class="modal-btn" onclick="addWhatsApp()">Tambah & Dapatkan Kode Pairing</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Konfirmasi Hapus -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="color:#ff6464">Hapus WhatsApp</h2>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p style="color:#888;margin-bottom:20px">Apakah Anda yakin ingin menghapus session <strong id="deletePhone" style="color:#fff"></strong>?</p>
+            <p style="color:#ff6464;font-size:0.9em;margin-bottom:20px">Tindakan ini tidak dapat dibatalkan!</p>
+            <div style="display:flex;gap:10px">
+                <button class="btn" style="background:#333;color:#fff" onclick="closeDeleteModal()">Batal</button>
+                <button class="btn btn-stop" onclick="confirmDelete()">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         const startTime = Date.now();
+        let deleteTarget = null;
         
         function formatUptime(ms) {
             const seconds = Math.floor(ms / 1000);
@@ -275,6 +489,12 @@ const getHTML = () => `
                 document.getElementById('uptime').textContent = formatUptime(Date.now() - startTime);
                 
                 const grid = document.getElementById('sessionsGrid');
+                
+                if (data.sessions.length === 0) {
+                    grid.innerHTML = '<div class="empty-state"><h3>Belum ada WhatsApp</h3><p>Klik "Tambah WhatsApp" untuk memulai</p></div>';
+                    return;
+                }
+                
                 grid.innerHTML = data.sessions.map(session => {
                     const isActive = data.activeBots.includes(session);
                     const logs = data.logs[session] || [];
@@ -300,6 +520,9 @@ const getHTML = () => `
                                 <button class="btn btn-stop" onclick="stopBot('\${session}')" \${!isActive ? 'disabled' : ''}>
                                     Stop
                                 </button>
+                                <button class="btn btn-delete" onclick="showDeleteModal('\${session}')" \${isActive ? 'disabled' : ''}>
+                                    Hapus
+                                </button>
                             </div>
                         </div>
                     \`;
@@ -322,6 +545,106 @@ const getHTML = () => `
         async function stopBot(session) {
             await fetch('/api/stop/' + session, { method: 'POST' });
             fetchStatus();
+        }
+        
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('show');
+            document.getElementById('phoneInput').value = '';
+            document.getElementById('addModalBody').innerHTML = \`
+                <div class="form-group">
+                    <label>Nomor WhatsApp</label>
+                    <input type="text" id="phoneInput" placeholder="628xxxxxxxxxx" />
+                    <small>Masukkan nomor dengan kode negara (tanpa +)</small>
+                </div>
+                <button class="modal-btn" onclick="addWhatsApp()">Tambah & Dapatkan Kode Pairing</button>
+            \`;
+        }
+        
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('show');
+        }
+        
+        async function addWhatsApp() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!phone) {
+                alert('Masukkan nomor WhatsApp!');
+                return;
+            }
+            
+            const res = await fetch('/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                document.getElementById('addModalBody').innerHTML = \`
+                    <div class="pairing-code">
+                        <p style="color:#00d9ff;margin-bottom:15px">Menunggu Kode Pairing...</p>
+                        <div class="code pulse" id="pairingCode">----</div>
+                        <p>Masukkan kode ini di WhatsApp > Perangkat Tertaut > Tautkan Perangkat</p>
+                    </div>
+                    <p style="color:#888;font-size:0.9em;text-align:center">Kode akan muncul dalam beberapa detik. Cek juga di log session.</p>
+                    <button class="modal-btn" style="margin-top:20px;background:#333;color:#fff" onclick="closeAddModal()">Tutup</button>
+                \`;
+                
+                // Poll for pairing code
+                let attempts = 0;
+                const checkCode = setInterval(async () => {
+                    attempts++;
+                    const statusRes = await fetch('/api/status');
+                    const statusData = await statusRes.json();
+                    const logs = statusData.logs[data.phone] || [];
+                    
+                    for (const log of logs) {
+                        if (log.msg.includes('KODE PAIRING')) {
+                            const match = log.msg.match(/KODE PAIRING.*?:\\s*([\\d-]+)/);
+                            if (match) {
+                                document.getElementById('pairingCode').textContent = match[1];
+                                document.getElementById('pairingCode').classList.remove('pulse');
+                                clearInterval(checkCode);
+                            }
+                        }
+                        if (log.msg.includes('TERHUBUNG')) {
+                            document.getElementById('pairingCode').textContent = 'CONNECTED!';
+                            document.getElementById('pairingCode').style.color = '#00ff88';
+                            clearInterval(checkCode);
+                        }
+                    }
+                    
+                    if (attempts > 30) clearInterval(checkCode);
+                }, 2000);
+                
+                fetchStatus();
+            } else {
+                alert(data.message);
+            }
+        }
+        
+        function showDeleteModal(session) {
+            deleteTarget = session;
+            document.getElementById('deletePhone').textContent = '+' + session;
+            document.getElementById('deleteModal').classList.add('show');
+        }
+        
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('show');
+            deleteTarget = null;
+        }
+        
+        async function confirmDelete() {
+            if (!deleteTarget) return;
+            
+            const res = await fetch('/api/delete/' + deleteTarget, { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.success) {
+                closeDeleteModal();
+                fetchStatus();
+            } else {
+                alert(data.message);
+            }
         }
         
         fetchStatus();
@@ -358,6 +681,27 @@ const server = http.createServer((req, res) => {
     else if (url.pathname.startsWith('/api/stop/') && req.method === 'POST') {
         const session = url.pathname.split('/')[3];
         const result = stopBotProcess(session);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+    }
+    else if (url.pathname === '/api/add' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { phone } = JSON.parse(body);
+                const result = addSession(phone);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, message: 'Invalid request' }));
+            }
+        });
+    }
+    else if (url.pathname.startsWith('/api/delete/') && req.method === 'POST') {
+        const session = url.pathname.split('/')[3];
+        const result = deleteSession(session);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
     }

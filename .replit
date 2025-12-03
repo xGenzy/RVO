@@ -27,15 +27,24 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "WhatsApp Bot Manager"
+args = "WhatsApp Bot Monitor"
 
 [[workflows.workflow]]
-name = "WhatsApp Bot Manager"
+name = "WhatsApp Bot Monitor"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node menu.js"
+args = "node server.js"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 42971
+externalPort = 3000

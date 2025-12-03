@@ -2,6 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
+//const localtunnel = require('localtunnel'); 
+const crypto = require('crypto');
 
 const PORT = 5000;
 
@@ -9,6 +11,7 @@ const activeBots = new Map();
 const botLogs = new Map();
 const pairingCodes = new Map();
 
+// --- FUNCTION UTILS ---
 const getSessions = () => {
     return fs.readdirSync('./').filter(file => {
         return fs.statSync(file).isDirectory() && /^\d+$/.test(file);
@@ -19,6 +22,7 @@ const getWIBTime = () => {
     return new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
 };
 
+// --- BOT PROCESS MANAGER ---
 const startBotProcess = (sessionName) => {
     if (activeBots.has(sessionName)) {
         return { success: false, message: 'Bot sudah berjalan' };
@@ -46,13 +50,11 @@ const startBotProcess = (sessionName) => {
                         const code = parts[parts.length - 1].trim();
                         if (code) {
                             pairingCodes.set(sessionName, code);
-                            console.log(`[PAIRING] ${sessionName}: ${code}`);
                         }
                     }
                 }
                 if (line.includes('TERHUBUNG')) {
                     pairingCodes.set(sessionName, 'CONNECTED');
-                    console.log(`[CONNECTED] ${sessionName}`);
                 }
             }
         });
@@ -88,738 +90,397 @@ const stopBotProcess = (sessionName) => {
 
 const deleteSession = (sessionName) => {
     if (activeBots.has(sessionName)) {
-        return { success: false, message: 'Bot sedang berjalan! Stop dulu sebelum menghapus.' };
+        return { success: false, message: 'Bot sedang berjalan! Stop dulu.' };
     }
-    
     const sessionPath = `./${sessionName}`;
     if (!fs.existsSync(sessionPath)) {
         return { success: false, message: 'Session tidak ditemukan' };
     }
-    
     try {
         fs.rmSync(sessionPath, { recursive: true, force: true });
         botLogs.delete(sessionName);
         pairingCodes.delete(sessionName);
-        return { success: true, message: 'Session berhasil dihapus' };
+        return { success: true, message: 'Session dihapus' };
     } catch (e) {
-        return { success: false, message: 'Gagal menghapus: ' + e.message };
+        return { success: false, message: 'Gagal: ' + e.message };
     }
 };
 
 const addSession = (phoneNumber) => {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
-    if (cleanPhone.length < 10) {
-        return { success: false, message: 'Nomor tidak valid (minimal 10 digit)' };
-    }
-    
-    if (getSessions().includes(cleanPhone)) {
-        return { success: false, message: 'Nomor sudah terdaftar' };
-    }
+    if (cleanPhone.length < 10) return { success: false, message: 'Nomor tidak valid' };
+    if (getSessions().includes(cleanPhone)) return { success: false, message: 'Nomor sudah ada' };
     
     pairingCodes.set(cleanPhone, 'WAITING');
     startBotProcess(cleanPhone);
-    return { success: true, message: 'Memproses pairing...', phone: cleanPhone };
+    return { success: true, message: 'Processing...', phone: cleanPhone };
 };
 
 const startAllBots = () => {
-    const sessions = getSessions();
-    let started = 0;
-    sessions.forEach(session => {
-        if (!activeBots.has(session)) {
-            startBotProcess(session);
-            started++;
-        }
-    });
-    return { success: true, message: `${started} bot dimulai` };
+    getSessions().forEach(s => { if (!activeBots.has(s)) startBotProcess(s); });
+    return { success: true, message: 'All bots started' };
 };
 
 const stopAllBots = () => {
-    const count = activeBots.size;
-    activeBots.forEach((child, session) => {
-        child.kill();
-    });
+    activeBots.forEach((child) => child.kill());
     activeBots.clear();
-    return { success: true, message: `${count} bot dihentikan` };
+    return { success: true, message: 'All bots stopped' };
 };
 
+// --- HTML FRONTEND (MOBILE LAYOUT) ---
 const getHTML = () => `
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WA • Cyber Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-dark: #050b14;
+            --bg-panel: #0a141f;
+            --wa-green: #00ff88;
+            --wa-dark: #005c4b;
+            --cyan: #00d9ff;
+            --red: #ff3333;
+            --text-main: #e0e6ed;
+            --text-dim: #5c6b7f;
+            --border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Rajdhani', sans-serif;
             min-height: 100vh;
-            color: #fff;
+            overflow-x: hidden;
+            padding-bottom: 20px;
         }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        
-        .header {
-            text-align: center;
-            padding: 30px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 30px;
+
+        /* Background Effects */
+        body::after {
+            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 2px; pointer-events: none; z-index: 999; opacity: 0.3;
         }
-        .header h1 {
-            font-size: 2.5em;
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+
+        /* HEADER */
+        .top-bar {
+            height: 60px; background: var(--bg-panel); border-bottom: var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; position: sticky; top: 0; z-index: 100;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
         }
-        .header p { color: #888; }
-        
-        .clock {
-            background: rgba(0,217,255,0.1);
-            border: 1px solid rgba(0,217,255,0.3);
-            border-radius: 10px;
-            padding: 15px 25px;
-            display: inline-block;
-            margin-top: 15px;
+        .logo-area {
+            font-family: 'JetBrains Mono'; font-weight: 700; color: var(--wa-green);
+            font-size: 18px; letter-spacing: 1px; display: flex; gap: 8px; align-items: center;
         }
-        .clock .time {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: #00d9ff;
-            font-family: 'Consolas', monospace;
+        .time-display { font-family: 'JetBrains Mono'; color: var(--cyan); font-size: 14px; }
+
+        /* CONTAINER */
+        .container { padding: 15px; max-width: 800px; margin: 0 auto; }
+
+        /* STATS (Grid 2x2 on mobile) */
+        .stats-bar {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;
         }
-        .clock .date {
-            color: #888;
-            font-size: 0.9em;
-            margin-top: 5px;
+        .stat-box {
+            background: rgba(0, 255, 136, 0.05); border: 1px solid rgba(0, 255, 136, 0.1);
+            padding: 10px; border-radius: 4px; display: flex; flex-direction: column;
+            align-items: center; text-align: center;
         }
-        .clock .zone {
-            color: #00ff88;
-            font-size: 0.8em;
-        }
-        
-        .actions-bar {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        .action-btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1em;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .action-btn.add {
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            color: #1a1a2e;
-        }
-        .action-btn.start-all {
-            background: rgba(0,255,136,0.2);
-            color: #00ff88;
-            border: 1px solid #00ff88;
-        }
-        .action-btn.stop-all {
-            background: rgba(255,100,100,0.2);
-            color: #ff6464;
-            border: 1px solid #ff6464;
-        }
-        .action-btn:hover { opacity: 0.85; transform: scale(1.02); }
-        
-        .stats {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-        .stat-card {
-            flex: 1;
-            min-width: 150px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .stat-card .number {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #00d9ff;
-        }
-        .stat-card .label { color: #888; margin-top: 5px; }
-        .stat-card.active .number { color: #00ff88; }
-        
-        .sessions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-        }
-        
-        .session-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .session-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        
-        .session-header {
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .session-info h3 {
-            font-size: 1.2em;
-            margin-bottom: 5px;
-        }
-        .session-info .phone {
-            color: #888;
-            font-size: 0.9em;
-        }
-        
-        .status {
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        .status.online {
-            background: rgba(0,255,136,0.2);
-            color: #00ff88;
-        }
-        .status.offline {
-            background: rgba(255,100,100,0.2);
-            color: #ff6464;
-        }
-        
-        .session-logs {
-            height: 150px;
-            overflow-y: auto;
-            padding: 15px;
-            background: rgba(0,0,0,0.3);
-            font-family: 'Consolas', monospace;
-            font-size: 0.8em;
-        }
-        .session-logs::-webkit-scrollbar { width: 5px; }
-        .session-logs::-webkit-scrollbar-thumb { background: #444; border-radius: 5px; }
-        
-        .log-line { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .log-line .time { color: #666; margin-right: 10px; }
-        .log-line.error { color: #ff6464; }
-        .log-line.system { color: #ffaa00; }
-        .log-line.info { color: #00d9ff; }
-        
-        .session-actions {
-            padding: 15px 20px;
-            display: flex;
-            gap: 10px;
-        }
+        .stat-box .label { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 2px; }
+        .stat-box .value { font-size: 18px; font-family: 'JetBrains Mono'; font-weight: bold; }
+        .stat-box.online .value { color: var(--wa-green); text-shadow: 0 0 5px var(--wa-green); }
+        .stat-box.offline .value { color: var(--red); }
+
+        /* ACTION BUTTONS */
+        .main-controls { display: flex; gap: 8px; margin-bottom: 20px; }
         .btn {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-            font-size: 0.9em;
+            flex: 1; padding: 12px 5px; border: none; font-family: 'Rajdhani'; font-weight: bold;
+            font-size: 12px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            transition: 0.2s;
         }
-        .btn-start {
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            color: #1a1a2e;
-        }
-        .btn-stop {
-            background: linear-gradient(90deg, #ff6464, #ff8888);
-            color: #fff;
-        }
-        .btn-delete {
-            background: rgba(255,100,100,0.2);
-            color: #ff6464;
-            border: 1px solid #ff6464;
-        }
-        .btn:hover { opacity: 0.8; transform: scale(1.02); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-green { background: var(--wa-green); color: #000; }
+        .btn-green:active { transform: scale(0.98); background: #fff; }
+        .btn-blue { background: rgba(0, 217, 255, 0.1); border: 1px solid var(--cyan); color: var(--cyan); }
+        .btn-red { background: rgba(255, 51, 51, 0.1); border: 1px solid var(--red); color: var(--red); }
+
+        /* BOT LIST (GRID SYSTEM) */
+        .section-title { color: var(--text-dim); font-size: 12px; margin-bottom: 10px; letter-spacing: 2px; border-bottom: 1px solid #222; padding-bottom: 5px; }
         
-        .refresh-note {
-            text-align: center;
-            color: #666;
-            margin-top: 30px;
-            font-size: 0.9em;
+        .bot-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 25px;
         }
+
+        .bot-card {
+            background: rgba(255,255,255,0.03); border: 1px solid transparent;
+            padding: 15px 10px; border-radius: 4px; cursor: pointer; position: relative;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+            transition: all 0.2s;
+        }
+        .bot-card:active { transform: scale(0.98); }
+        .bot-card.active { border-color: var(--wa-green); background: rgba(0, 255, 136, 0.05); }
+        .bot-card.online { border-bottom: 2px solid var(--wa-green); }
+        .bot-card.offline { border-bottom: 2px solid var(--red); opacity: 0.7; }
         
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
+        .bot-card h3 { font-family: 'JetBrains Mono'; font-size: 14px; color: #fff; }
+        .bot-card span { font-size: 10px; padding: 2px 6px; border-radius: 2px; }
+        .bot-card.online span { background: var(--wa-green); color: #000; }
+        .bot-card.offline span { background: var(--red); color: #fff; }
+
+        /* TERMINAL (DI BAWAH) */
+        .terminal-container {
+            background: #000; border: 1px solid #333; border-radius: 6px;
+            display: flex; flex-direction: column; overflow: hidden;
+            height: 400px; /* Fixed height for log area */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
-        .modal.show { display: flex; }
-        .modal-content {
-            background: #1a1a2e;
-            border-radius: 20px;
-            padding: 30px;
-            width: 90%;
-            max-width: 500px;
-            border: 1px solid rgba(255,255,255,0.1);
+        .terminal-header {
+            background: #111; padding: 8px 12px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-        .modal-header h2 {
-            color: #00d9ff;
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            color: #888;
-            font-size: 1.5em;
-            cursor: pointer;
-        }
-        .modal-close:hover { color: #fff; }
+        .terminal-title { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--wa-green); }
         
-        .form-group {
-            margin-bottom: 20px;
+        .terminal-actions button {
+            background: transparent; border: 1px solid #444; color: #888; margin-left: 5px;
+            padding: 2px 8px; font-size: 10px; cursor: pointer; font-family: 'JetBrains Mono';
         }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #888;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 15px;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            background: rgba(255,255,255,0.05);
-            color: #fff;
-            font-size: 1.1em;
-        }
-        .form-group input:focus {
-            outline: none;
-            border-color: #00d9ff;
-        }
-        .form-group small {
-            display: block;
-            margin-top: 8px;
-            color: #666;
+        .terminal-actions button.del { border-color: var(--red); color: var(--red); }
+        
+        .terminal-logs {
+            flex: 1; padding: 10px; overflow-y: auto; font-family: 'JetBrains Mono'; font-size: 11px;
+            color: #ccc; line-height: 1.4; background: radial-gradient(circle at center, #111 0%, #000 100%);
         }
         
-        .modal-btn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1em;
-            background: linear-gradient(90deg, #00d9ff, #00ff88);
-            color: #1a1a2e;
-            transition: all 0.3s;
-        }
-        .modal-btn:hover { opacity: 0.85; }
-        .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .pairing-box {
-            text-align: center;
-            padding: 25px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 15px;
-            margin: 20px 0;
-            border: 2px dashed rgba(0,217,255,0.3);
-        }
-        .pairing-box .label {
-            color: #888;
-            margin-bottom: 15px;
-            font-size: 0.9em;
-        }
-        .pairing-box .code {
-            font-size: 3em;
-            font-weight: bold;
-            color: #00ff88;
-            letter-spacing: 8px;
-            font-family: 'Consolas', monospace;
-            text-shadow: 0 0 20px rgba(0,255,136,0.5);
-        }
-        .pairing-box .code.waiting {
-            color: #ffaa00;
-            font-size: 1.5em;
-            letter-spacing: 0;
-        }
-        .pairing-box .code.connected {
-            color: #00ff88;
-            font-size: 1.5em;
-            letter-spacing: 0;
-        }
-        .pairing-box .instruction {
-            color: #666;
-            margin-top: 20px;
-            font-size: 0.85em;
-            line-height: 1.6;
-        }
-        .pairing-box .step {
-            background: rgba(255,255,255,0.05);
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            text-align: left;
-            color: #888;
-        }
-        .pairing-box .step span {
-            color: #00d9ff;
-            font-weight: bold;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .pulse { animation: pulse 2s infinite; }
-        
-        @keyframes glow {
-            0%, 100% { text-shadow: 0 0 20px rgba(0,255,136,0.5); }
-            50% { text-shadow: 0 0 40px rgba(0,255,136,0.8); }
-        }
-        .glow { animation: glow 1.5s infinite; }
-        
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #666;
-        }
-        .empty-state h3 { margin-bottom: 10px; color: #888; }
+        .log-entry { margin-bottom: 3px; display: flex; flex-wrap: wrap; }
+        .log-time { color: #555; margin-right: 6px; font-size: 10px; }
+        .log-msg { word-break: break-all; }
+        .info .log-msg { color: var(--cyan); }
+        .error .log-msg { color: var(--red); }
+        .system .log-msg { color: #ffeb3b; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; align-items: center; justify-content: center; }
+        .modal-box { background: var(--bg-panel); border: 1px solid var(--wa-green); padding: 25px; width: 90%; max-width: 350px; }
+        .input-cyber { width: 100%; padding: 10px; background: #000; border: 1px solid #333; color: var(--wa-green); font-family: 'JetBrains Mono'; margin: 15px 0; outline: none; }
+        .hidden { display: none !important; }
+
     </style>
 </head>
 <body>
+
+    <header class="top-bar">
+        <div class="logo-area"><span>⚡</span> CYBER MON</div>
+        <div class="time-display" id="clock">00:00</div>
+    </header>
+
     <div class="container">
-        <div class="header">
-            <h1>WhatsApp Bot Monitor</h1>
-            <p>Real-time monitoring dashboard</p>
-            <div class="clock">
-                <div class="time" id="clockTime">--:--:--</div>
-                <div class="date" id="clockDate">Loading...</div>
-                <div class="zone">WIB (Asia/Jakarta)</div>
+        <!-- STATS ROW -->
+        <div class="stats-bar">
+            <div class="stat-box">
+                <span class="label">TOTAL</span>
+                <span class="value" id="statTotal">0</span>
+            </div>
+            <div class="stat-box online">
+                <span class="label">ONLINE</span>
+                <span class="value" id="statActive">0</span>
+            </div>
+            <div class="stat-box offline">
+                <span class="label">OFFLINE</span>
+                <span class="value" id="statOffline">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="label">UPTIME</span>
+                <span class="value" style="font-size:14px" id="statUptime">0h</span>
             </div>
         </div>
-        
-        <div class="actions-bar">
-            <button class="action-btn add" onclick="showAddModal()">
-                <span>+</span> Tambah WhatsApp
-            </button>
-            <button class="action-btn start-all" onclick="startAll()">
-                Aktifkan Semua
-            </button>
-            <button class="action-btn stop-all" onclick="stopAll()">
-                Matikan Semua
-            </button>
+
+        <!-- MAIN CONTROLS -->
+        <div class="main-controls">
+            <button class="btn btn-green" onclick="openAddModal()">+ ADD BOT</button>
+            <button class="btn btn-blue" onclick="startAll()">ALL ON</button>
+            <button class="btn btn-red" onclick="stopAll()">ALL OFF</button>
         </div>
-        
-        <div class="stats" id="stats">
-            <div class="stat-card">
-                <div class="number" id="totalSessions">-</div>
-                <div class="label">Total Sesi</div>
-            </div>
-            <div class="stat-card active">
-                <div class="number" id="activeBots">-</div>
-                <div class="label">Bot Aktif</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" id="uptime">-</div>
-                <div class="label">Uptime</div>
-            </div>
+
+        <!-- BOT LIST GRID -->
+        <div class="section-title">> SESSION LIST</div>
+        <div class="bot-grid" id="botGrid">
+            <!-- Bot Cards Injected Here -->
         </div>
-        
-        <div class="sessions-grid" id="sessionsGrid"></div>
-        
-        <p class="refresh-note pulse">Auto-refresh setiap 3 detik</p>
-    </div>
-    
-    <!-- Modal Tambah WhatsApp -->
-    <div class="modal" id="addModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Tambah WhatsApp</h2>
-                <button class="modal-close" onclick="closeAddModal()">&times;</button>
-            </div>
-            <div id="addModalBody">
-                <div class="form-group">
-                    <label>Nomor WhatsApp</label>
-                    <input type="text" id="phoneInput" placeholder="628xxxxxxxxxx" />
-                    <small>Masukkan nomor dengan kode negara (tanpa +)</small>
+
+        <!-- TERMINAL AREA -->
+        <div class="section-title">> TERMINAL LOGS</div>
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <div class="terminal-title" id="termTitle">NO SESSION SELECTED</div>
+                <div class="terminal-actions" id="termActions" style="display:none">
+                    <button onclick="controlBot('start')">START</button>
+                    <button onclick="controlBot('stop')">STOP</button>
+                    <button class="del" onclick="controlBot('delete')">DEL</button>
                 </div>
-                <button class="modal-btn" onclick="addWhatsApp()">Tambah & Dapatkan Kode Pairing</button>
+            </div>
+            <div class="terminal-logs" id="terminalLogs">
+                <div style="text-align:center; padding-top:100px; color:#333;">
+                    SELECT A BOT ABOVE<br>TO VIEW LOGS
+                </div>
             </div>
         </div>
     </div>
-    
-    <!-- Modal Konfirmasi Hapus -->
-    <div class="modal" id="deleteModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 style="color:#ff6464">Hapus WhatsApp</h2>
-                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+
+    <!-- ADD MODAL -->
+    <div class="modal" id="addModal">
+        <div class="modal-box">
+            <h3 style="color:var(--text-main)">NEW TARGET</h3>
+            <div id="step1">
+                <input type="number" class="input-cyber" id="phoneInput" placeholder="628xxx">
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-red" onclick="closeAddModal()">CANCEL</button>
+                    <button class="btn btn-green" onclick="submitAddBot()">GET CODE</button>
+                </div>
             </div>
-            <p style="color:#888;margin-bottom:20px">Apakah Anda yakin ingin menghapus session <strong id="deletePhone" style="color:#fff"></strong>?</p>
-            <p style="color:#ff6464;font-size:0.9em;margin-bottom:20px">Tindakan ini tidak dapat dibatalkan!</p>
-            <div style="display:flex;gap:10px">
-                <button class="btn" style="background:#333;color:#fff" onclick="closeDeleteModal()">Batal</button>
-                <button class="btn btn-stop" onclick="confirmDelete()">Ya, Hapus</button>
+            <div id="step2" class="hidden" style="text-align:center;">
+                <p style="color:var(--cyan); font-size:12px; margin-top:10px;">PAIRING CODE:</p>
+                <div id="pairingCodeDisplay" style="font-size:28px; font-weight:bold; color:var(--wa-green); margin:15px 0; letter-spacing:3px;">...</div>
+                <button class="btn btn-red" style="width:100%" onclick="closeAddModal()">CLOSE</button>
             </div>
         </div>
     </div>
-    
+
     <script>
+        let selectedSession = null;
+        let lastData = null;
         const startTime = Date.now();
-        let deleteTarget = null;
-        let currentPairingPhone = null;
         let pairingInterval = null;
-        
-        function updateClock() {
-            const now = new Date();
-            const options = { timeZone: 'Asia/Jakarta' };
-            const timeStr = now.toLocaleTimeString('id-ID', { ...options, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const dateStr = now.toLocaleDateString('id-ID', { ...options, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            
-            document.getElementById('clockTime').textContent = timeStr;
-            document.getElementById('clockDate').textContent = dateStr;
-        }
-        
-        function formatUptime(ms) {
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            if (hours > 0) return hours + 'h ' + (minutes % 60) + 'm';
-            if (minutes > 0) return minutes + 'm ' + (seconds % 60) + 's';
-            return seconds + 's';
-        }
-        
+
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour12: false, hour:'2-digit', minute:'2-digit'});
+            const diff = Math.floor((Date.now() - startTime) / 1000);
+            const h = Math.floor(diff/3600);
+            const m = Math.floor((diff%3600)/60);
+            document.getElementById('statUptime').innerText = \`\${h}h \${m}m\`;
+        }, 1000);
+
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                
-                document.getElementById('totalSessions').textContent = data.sessions.length;
-                document.getElementById('activeBots').textContent = data.activeBots.length;
-                document.getElementById('uptime').textContent = formatUptime(Date.now() - startTime);
-                
-                const grid = document.getElementById('sessionsGrid');
-                
-                if (data.sessions.length === 0) {
-                    grid.innerHTML = '<div class="empty-state"><h3>Belum ada WhatsApp</h3><p>Klik "Tambah WhatsApp" untuk memulai</p></div>';
-                    return;
-                }
-                
-                grid.innerHTML = data.sessions.map(session => {
-                    const isActive = data.activeBots.includes(session);
-                    const logs = data.logs[session] || [];
-                    return \`
-                        <div class="session-card">
-                            <div class="session-header">
-                                <div class="session-info">
-                                    <h3>Bot Session</h3>
-                                    <div class="phone">+\${session}</div>
-                                </div>
-                                <div class="status \${isActive ? 'online' : 'offline'}">
-                                    \${isActive ? 'ONLINE' : 'OFFLINE'}
-                                </div>
-                            </div>
-                            <div class="session-logs" id="logs-\${session}">
-                                \${logs.length === 0 ? '<div class="log-line" style="color:#666">Tidak ada log...</div>' : 
-                                    logs.slice(-20).map(l => \`<div class="log-line \${l.type}"><span class="time">\${l.time}</span>\${l.msg}</div>\`).join('')}
-                            </div>
-                            <div class="session-actions">
-                                <button class="btn btn-start" onclick="startBot('\${session}')" \${isActive ? 'disabled' : ''}>
-                                    Start
-                                </button>
-                                <button class="btn btn-stop" onclick="stopBot('\${session}')" \${!isActive ? 'disabled' : ''}>
-                                    Stop
-                                </button>
-                                <button class="btn btn-delete" onclick="showDeleteModal('\${session}')" \${isActive ? 'disabled' : ''}>
-                                    Hapus
-                                </button>
-                            </div>
-                        </div>
-                    \`;
-                }).join('');
-                
-                data.sessions.forEach(session => {
-                    const logsDiv = document.getElementById('logs-' + session);
-                    if (logsDiv) logsDiv.scrollTop = logsDiv.scrollHeight;
-                });
-            } catch (e) {
-                console.error('Fetch error:', e);
-            }
+                lastData = data;
+                renderUI(data);
+            } catch (e) {}
         }
-        
-        async function startBot(session) {
-            await fetch('/api/start/' + session, { method: 'POST' });
-            fetchStatus();
+
+        function renderUI(data) {
+            // Stats
+            document.getElementById('statTotal').innerText = data.sessions.length;
+            document.getElementById('statActive').innerText = data.activeBots.length;
+            document.getElementById('statOffline').innerText = data.sessions.length - data.activeBots.length;
+
+            // Bot Grid
+            const grid = document.getElementById('botGrid');
+            const currentHTML = data.sessions.map(s => {
+                const isActive = data.activeBots.includes(s);
+                const isSelected = selectedSession === s ? 'active' : '';
+                return \`
+                    <div class="bot-card \${isActive ? 'online' : 'offline'} \${isSelected}" onclick="selectBot('\${s}')">
+                        <h3>+\${s}</h3>
+                        <span>\${isActive ? 'ONLINE' : 'OFFLINE'}</span>
+                    </div>
+                \`;
+            }).join('');
+            
+            if (grid.innerHTML !== currentHTML) grid.innerHTML = currentHTML;
+
+            // Logs
+            updateTerminal(data);
         }
-        
-        async function stopBot(session) {
-            await fetch('/api/stop/' + session, { method: 'POST' });
-            fetchStatus();
-        }
-        
-        async function startAll() {
-            await fetch('/api/start-all', { method: 'POST' });
-            fetchStatus();
-        }
-        
-        async function stopAll() {
-            await fetch('/api/stop-all', { method: 'POST' });
-            fetchStatus();
-        }
-        
-        function showAddModal() {
-            document.getElementById('addModal').classList.add('show');
-            document.getElementById('addModalBody').innerHTML = \`
-                <div class="form-group">
-                    <label>Nomor WhatsApp</label>
-                    <input type="text" id="phoneInput" placeholder="628xxxxxxxxxx" />
-                    <small>Masukkan nomor dengan kode negara (tanpa +)</small>
-                </div>
-                <button class="modal-btn" onclick="addWhatsApp()">Tambah & Dapatkan Kode Pairing</button>
-            \`;
-        }
-        
-        function closeAddModal() {
-            document.getElementById('addModal').classList.remove('show');
-            if (pairingInterval) {
-                clearInterval(pairingInterval);
-                pairingInterval = null;
-            }
-            currentPairingPhone = null;
-        }
-        
-        async function addWhatsApp() {
-            const phone = document.getElementById('phoneInput').value.trim();
-            if (!phone) {
-                alert('Masukkan nomor WhatsApp!');
+
+        function updateTerminal(data) {
+            if (!selectedSession) return;
+            
+            document.getElementById('termTitle').innerText = \`ROOT@\${selectedSession}\`;
+            document.getElementById('termActions').style.display = 'block';
+
+            const logs = data.logs[selectedSession] || [];
+            const logContainer = document.getElementById('terminalLogs');
+            
+            if (logs.length === 0) {
+                logContainer.innerHTML = '<div style="padding:10px; color:#555">No logs yet...</div>';
                 return;
             }
-            
-            const res = await fetch('/api/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone })
-            });
+
+            const html = logs.map(l => \`
+                <div class="log-entry \${l.type}">
+                    <span class="log-time">[\${l.time}]</span>
+                    <span class="log-msg">\${l.msg}</span>
+                </div>
+            \`).join('');
+
+            const shouldScroll = logContainer.scrollTop + logContainer.clientHeight >= logContainer.scrollHeight - 50;
+            if (logContainer.innerHTML !== html) {
+                logContainer.innerHTML = html;
+                if (shouldScroll) logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function selectBot(session) {
+            selectedSession = session;
+            if (lastData) renderUI(lastData);
+            // Scroll ke terminal saat bot dipilih agar user sadar log ada dibawah
+            document.querySelector('.terminal-container').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function controlBot(action) {
+            if (!selectedSession) return;
+            await fetch(\`/api/\${action}/\${selectedSession}\`, { method: 'POST' });
+            if (action === 'delete') {
+                selectedSession = null;
+                document.getElementById('terminalLogs').innerHTML = '<div style="text-align:center; padding-top:100px; color:#333;">DELETED</div>';
+                document.getElementById('termActions').style.display = 'none';
+            }
+            fetchStatus();
+        }
+
+        async function startAll() { await fetch('/api/start-all', { method: 'POST' }); fetchStatus(); }
+        async function stopAll() { await fetch('/api/stop-all', { method: 'POST' }); fetchStatus(); }
+
+        // Modal Logic
+        function openAddModal() { document.getElementById('addModal').style.display = 'flex'; document.getElementById('step1').classList.remove('hidden'); document.getElementById('step2').classList.add('hidden'); }
+        function closeAddModal() { document.getElementById('addModal').style.display = 'none'; if(pairingInterval) clearInterval(pairingInterval); }
+
+        async function submitAddBot() {
+            const phone = document.getElementById('phoneInput').value;
+            if (!phone) return alert('Input Number');
+            const res = await fetch('/api/add', { method: 'POST', body: JSON.stringify({ phone }) });
             const data = await res.json();
-            
             if (data.success) {
-                currentPairingPhone = data.phone;
-                
-                document.getElementById('addModalBody').innerHTML = \`
-                    <div class="pairing-box">
-                        <div class="label">KODE PAIRING WHATSAPP</div>
-                        <div class="code waiting pulse" id="pairingCode">Menunggu...</div>
-                        <div class="instruction">
-                            <div class="step"><span>1.</span> Buka WhatsApp di HP Anda</div>
-                            <div class="step"><span>2.</span> Ketuk Menu (titik 3) > Perangkat Tertaut</div>
-                            <div class="step"><span>3.</span> Ketuk "Tautkan Perangkat"</div>
-                            <div class="step"><span>4.</span> Masukkan kode di atas</div>
-                        </div>
-                    </div>
-                    <button class="modal-btn" style="background:#333;color:#fff" onclick="closeAddModal()">Tutup</button>
-                \`;
-                
-                // Poll for pairing code
-                let attempts = 0;
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
                 pairingInterval = setInterval(async () => {
-                    attempts++;
-                    try {
-                        const codeRes = await fetch('/api/pairing-code/' + currentPairingPhone);
-                        const codeData = await codeRes.json();
-                        
-                        const codeEl = document.getElementById('pairingCode');
-                        if (!codeEl) {
-                            clearInterval(pairingInterval);
-                            return;
-                        }
-                        
-                        if (codeData.code === 'CONNECTED') {
-                            codeEl.textContent = 'TERHUBUNG!';
-                            codeEl.className = 'code connected glow';
-                            clearInterval(pairingInterval);
-                        } else if (codeData.code && codeData.code !== 'WAITING') {
-                            codeEl.textContent = codeData.code;
-                            codeEl.className = 'code glow';
-                        }
-                    } catch (e) {}
-                    
-                    if (attempts > 60) {
-                        clearInterval(pairingInterval);
+                    const cRes = await fetch('/api/pairing-code/' + data.phone);
+                    const cData = await cRes.json();
+                    if (cData.code && cData.code !== 'WAITING') {
+                        document.getElementById('pairingCodeDisplay').innerText = cData.code === 'CONNECTED' ? 'SUCCESS' : cData.code;
+                        if(cData.code === 'CONNECTED') { clearInterval(pairingInterval); setTimeout(closeAddModal, 2000); fetchStatus(); }
                     }
-                }, 1500);
-                
-                fetchStatus();
-            } else {
-                alert(data.message);
-            }
+                }, 2000);
+            } else alert(data.message);
         }
-        
-        function showDeleteModal(session) {
-            deleteTarget = session;
-            document.getElementById('deletePhone').textContent = '+' + session;
-            document.getElementById('deleteModal').classList.add('show');
-        }
-        
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('show');
-            deleteTarget = null;
-        }
-        
-        async function confirmDelete() {
-            if (!deleteTarget) return;
-            
-            const res = await fetch('/api/delete/' + deleteTarget, { method: 'POST' });
-            const data = await res.json();
-            
-            if (data.success) {
-                closeDeleteModal();
-                fetchStatus();
-            } else {
-                alert(data.message);
-            }
-        }
-        
-        updateClock();
-        setInterval(updateClock, 1000);
-        
+
         fetchStatus();
-        setInterval(fetchStatus, 3000);
+        setInterval(fetchStatus, 2000);
     </script>
 </body>
 </html>
 `;
 
+// --- SERVER HANDLER ---
 const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${PORT}`);
-    
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Access-Control-Allow-Origin', '*');
     
     if (url.pathname === '/' || url.pathname === '/index.html') {
@@ -828,75 +489,79 @@ const server = http.createServer((req, res) => {
     }
     else if (url.pathname === '/api/status') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            sessions: getSessions(),
-            activeBots: Array.from(activeBots.keys()),
-            logs: Object.fromEntries(botLogs),
-            serverTime: getWIBTime()
-        }));
+        res.end(JSON.stringify({ sessions: getSessions(), activeBots: Array.from(activeBots.keys()), logs: Object.fromEntries(botLogs) }));
     }
     else if (url.pathname.startsWith('/api/pairing-code/')) {
         const phone = url.pathname.split('/')[3];
-        const code = pairingCodes.get(phone) || null;
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ code }));
+        res.end(JSON.stringify({ code: pairingCodes.get(phone) || null }));
     }
     else if (url.pathname.startsWith('/api/start/') && req.method === 'POST') {
-        const session = url.pathname.split('/')[3];
-        const result = startBotProcess(session);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(startBotProcess(url.pathname.split('/')[3])));
     }
     else if (url.pathname.startsWith('/api/stop/') && req.method === 'POST') {
-        const session = url.pathname.split('/')[3];
-        const result = stopBotProcess(session);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(stopBotProcess(url.pathname.split('/')[3])));
     }
     else if (url.pathname === '/api/start-all' && req.method === 'POST') {
-        const result = startAllBots();
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(startAllBots()));
     }
     else if (url.pathname === '/api/stop-all' && req.method === 'POST') {
-        const result = stopAllBots();
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(stopAllBots()));
     }
     else if (url.pathname === '/api/add' && req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => body += chunk);
+        req.on('data', c => body += c);
         req.on('end', () => {
             try {
-                const { phone } = JSON.parse(body);
-                const result = addSession(phone);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(result));
-            } catch (e) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: false, message: 'Invalid request' }));
-            }
+                res.end(JSON.stringify(addSession(JSON.parse(body).phone)));
+            } catch { res.writeHead(400); res.end(); }
         });
     }
     else if (url.pathname.startsWith('/api/delete/') && req.method === 'POST') {
-        const session = url.pathname.split('/')[3];
-        const result = deleteSession(session);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(deleteSession(url.pathname.split('/')[3])));
     }
-    else {
-        res.writeHead(404);
-        res.end('Not Found');
-    }
+    else { res.writeHead(404); res.end('Not Found'); }
 });
 
-process.on('SIGINT', () => {
-    console.log('\nMematikan semua bot...');
-    activeBots.forEach((child) => child.kill());
-    process.exit(0);
-});
+process.on('SIGINT', () => { activeBots.forEach(c => c.kill()); process.exit(0); });
+
+// ... (kode atas biarkan sama)
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🌐 WhatsApp Bot Monitor berjalan di port ${PORT}`);
-    console.log(`📊 Buka browser untuk melihat dashboard\n`);
+    console.log(`\n✅ Local Server: http://localhost:${PORT}`);
+    console.log('⏳ Menghubungkan ke Cloudflare Quick Tunnel...');
+    console.log('   (Ini solusi paling cepat & anti-blokir untuk Termux)');
+
+    // Menjalankan Cloudflared
+    const tunnel = spawn('cloudflared', [
+        'tunnel', 
+        '--url', `http://localhost:${PORT}`,
+        '--logfile', 'cloudflared.log' // Supaya log bersih
+    ]);
+
+    // Cloudflared mengeluarkan link lewat stderr
+    tunnel.stderr.on('data', (data) => {
+        const output = data.toString();
+        // Mencari link trycloudflare.com
+        const urlMatch = output.match(/https:\/\/[\w-]+\.trycloudflare\.com/);
+        
+        if (urlMatch) {
+            console.log(`\n🚀 LINK DASHBOARD BERHASIL:`);
+            console.log(`👉 ${urlMatch[0]}`);
+            console.log(`\n(Gunakan link ini di browser HP lain untuk monitoring)`);
+        }
+    });
+
+    tunnel.on('close', (code) => {
+        console.log(`Cloudflared berhenti (Code: ${code})`);
+    });
+    
+    // Matikan cloudflared jika bot dimatikan
+    process.on('exit', () => tunnel.kill());
 });

@@ -38,9 +38,6 @@ const config = {
     uptimeUrl: process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS || null,
 };
 
-// Random Keep-Alive Interval (8000-12000ms) agar tidak bertabrakan antar bot
-const getRandomKeepAlive = () => Math.floor(8000 + Math.random() * 4000);
-
 if (!fs.existsSync(config.downloadPath)) fs.mkdirSync(config.downloadPath, { recursive: true });
 
 const getWIBTime = () => {
@@ -55,9 +52,6 @@ async function startBot(sessionPhone) {
     const { version } = await fetchLatestBaileysVersion();
 
     // 2. Setup Socket (Konfigurasi Stabil Anti-Loop)
-    const randomKeepAlive = getRandomKeepAlive();
-    console.log(`🔄 Keep-Alive Interval: ${randomKeepAlive}ms`);
-    
     const sock = makeWASocket({
         version,
         logger: pino({ level: "silent" }),
@@ -68,7 +62,6 @@ async function startBot(sessionPhone) {
         },
         browser: Browsers.macOS("Chrome"), // Identitas Browser Stabil
         connectTimeoutMs: 60000,
-        keepAliveIntervalMs: randomKeepAlive, // Random interval agar tidak bertabrakan
         emitOwnEvents: true,
         fireInitQueries: true,
         generateHighQualityLinkPreview: true,

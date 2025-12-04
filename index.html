@@ -55,6 +55,9 @@
         // PASTE ID & KEY YANG SAMA DISINI
         const BIN_ID = '693151eed0ea881f40121ca6'; 
         const API_KEY = '$2a$10$u00Qvq6xrri32tc7bEYVhuQv94XS.ygeVCr70UDbzoOVlR8yLuUq.'; 
+        
+        // LINK UTAMA / FALLBACK (Jika error atau refresh)
+        const MAIN_URL = 'https://xgenzy.github.io/RVO/';
         // ==========================================
 
         async function connect() {
@@ -75,24 +78,38 @@
                 const data = await res.json();
                 const targetUrl = data.record.url;
 
-                if (!targetUrl) throw new Error("No URL Found");
+                // Cek validitas URL
+                if (!targetUrl || targetUrl.trim() === "") {
+                    throw new Error("No URL Found");
+                }
 
                 // 2. Link Ketemu!
                 pfill.style.width = "70%";
                 status.innerText = "TARGET FOUND. REDIRECTING...";
                 
-                // 3. Pindah Halaman Otomatis
+                // 3. Pindah Halaman Otomatis ke Link Cloudflare/Termux
                 pfill.style.width = "100%";
                 
                 setTimeout(() => {
-                    // MENGALIHKAN DENGAN CARA AMAN AGAR LOGIN JALAN
                     window.location.href = targetUrl;
                 }, 1000);
 
             } catch (e) {
-                pfill.style.background = "#ff3333";
-                status.style.color = "#ff3333";
-                status.innerHTML = `CONNECTION FAILED<br><span style="font-size:10px">${e.message}</span><br><br><button onclick="location.reload()" style="background:#333; color:#fff; border:none; padding:10px; cursor:pointer;">RETRY</button>`;
+                // ================= LOGIKA FALLBACK =================
+                // Jika error (refresh manual, link mati, db error)
+                // Kembali ke halaman utama (RVO)
+                pfill.style.width = "100%";
+                pfill.style.background = "#ff9900"; // Warna Orange tanda warning
+                status.style.color = "#ff9900";
+                
+                console.error(e); // Log error di console untuk debug
+                
+                status.innerHTML = `CONNECTION LOST.<br>RETURN TO MAIN SERVER...`;
+                
+                // Redirect otomatis ke link RVO setelah 2 detik
+                setTimeout(() => {
+                    window.location.href = MAIN_URL;
+                }, 2000);
             }
         }
 

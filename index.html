@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Connect • Cyber Dashboard</title>
+    <title>Cyber Launcher</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #050b14;
+            --panel: #0a141f;
             --wa-green: #25D366;
+            --text: #e0e6ed;
             --border: 1px solid rgba(37, 211, 102, 0.3);
         }
 
@@ -16,56 +18,56 @@
 
         body {
             background-color: var(--bg-dark);
-            color: #fff;
+            color: var(--text);
             font-family: 'Rajdhani', sans-serif;
             height: 100vh;
-            overflow: hidden;
             display: flex;
-            flex-direction: column;
-        }
-
-        /* TAMPILAN SETUP (INPUT LINK) */
-        #setup-screen {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: radial-gradient(circleAt center, #111 0%, #000 100%);
-            z-index: 10;
         }
 
-        .card {
-            background: #0a141f;
+        .container {
+            background: var(--panel);
             border: var(--border);
             padding: 30px;
             width: 100%;
             max-width: 400px;
             text-align: center;
-            box-shadow: 0 0 20px rgba(37, 211, 102, 0.1);
+            box-shadow: 0 0 30px rgba(37, 211, 102, 0.1);
+            border-radius: 8px;
         }
 
-        .logo { font-family: 'JetBrains Mono'; font-size: 40px; margin-bottom: 20px; }
-        .logo span { color: var(--wa-green); }
+        .logo {
+            margin-bottom: 20px;
+        }
+        .logo svg {
+            width: 60px; height: 60px; fill: var(--wa-green);
+        }
+        
+        h2 { margin-bottom: 10px; font-family: 'JetBrains Mono'; color: #fff; }
+        p { color: #888; font-size: 12px; margin-bottom: 25px; font-family: 'JetBrains Mono'; }
 
-        p { color: #888; font-size: 14px; margin-bottom: 20px; font-family: 'JetBrains Mono'; }
-
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { font-size: 10px; color: var(--wa-green); font-family: 'JetBrains Mono'; margin-left: 5px; }
+        
         input {
             width: 100%;
             padding: 15px;
             background: #000;
             border: 1px solid #333;
-            color: var(--wa-green);
+            color: #fff;
             font-family: 'JetBrains Mono';
-            margin-bottom: 15px;
+            font-size: 12px;
+            margin-top: 5px;
             outline: none;
-            text-align: center;
+            border-radius: 4px;
+            transition: 0.3s;
         }
         
-        input:focus { border-color: var(--wa-green); }
+        input:focus { border-color: var(--wa-green); box-shadow: 0 0 10px rgba(37, 211, 102, 0.2); }
 
-        button {
+        .btn-launch {
             width: 100%;
             padding: 15px;
             background: var(--wa-green);
@@ -73,112 +75,80 @@
             border: none;
             font-weight: bold;
             font-family: 'Rajdhani';
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
             letter-spacing: 2px;
             text-transform: uppercase;
+            border-radius: 4px;
+            transition: 0.2s;
         }
 
-        button:active { transform: scale(0.98); }
+        .btn-launch:active { transform: scale(0.98); opacity: 0.8; }
 
-        /* TAMPILAN UTAMA (IFRAME) */
-        #app-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: none; /* Hidden by default */
-        }
-
-        /* TOMBOL RESET MENGAMBANG */
-        #reset-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 0, 0, 0.2);
-            border: 1px solid red;
-            color: red;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 20px;
-            cursor: pointer;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
+        .btn-clear {
+            background: transparent; border: none; color: #555; 
+            font-size: 10px; margin-top: 15px; cursor: pointer; text-decoration: underline;
         }
     </style>
 </head>
 <body>
 
-    <!-- SCREEN 1: INPUT LINK -->
-    <div id="setup-screen">
-        <div class="card">
-            <div class="logo"><span>⚡</span> CONNECT</div>
-            <p>Paste your Cloudflare Tunnel URL here to launch the Dashboard.</p>
-            
-            <input type="text" id="urlInput" placeholder="https://xxxx-xxxx.trycloudflare.com">
-            <button onclick="saveAndLaunch()">LAUNCH SYSTEM</button>
-            <div id="errorMsg" style="color:red; font-size:12px; margin-top:10px; font-family:'JetBrains Mono'"></div>
+    <div class="container">
+        <div class="logo">
+            <!-- WhatsApp Logo -->
+            <svg viewBox="0 0 24 24">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.592 2.654-.694c1.003.545 1.912.811 2.806.811 3.181 0 5.767-2.587 5.767-5.766.001-3.182-2.585-5.769-5.767-5.769zm9.922 5.766c0 5.484-4.469 9.953-9.953 9.953-1.637 0-3.328-.429-4.729-1.229l-5.271 1.338 1.41-5.112c-.896-1.472-1.364-3.125-1.364-4.949 0-5.484 4.469-9.953 9.954-9.953 5.484 0 9.953 4.469 9.953 9.953zm-4.755 2.534c-.218-.109-1.291-.637-1.491-.709-.2-.074-.345-.109-.491.109-.145.218-.564.709-.691.854-.127.145-.255.164-.473.055-.218-.109-.921-.34-1.753-1.082-.656-.583-1.1-1.303-1.229-1.524-.127-.218-.014-.336.095-.444.099-.099.218-.255.327-.382.109-.127.145-.218.218-.364.073-.145.036-.273-.018-.382-.055-.109-.491-1.182-.673-1.618-.173-.417-.348-.362-.482-.369-.126-.007-.272-.009-.418-.009-.145 0-.382.055-.582.273-.2.218-.764.745-.764 1.818 0 1.073.782 2.109.891 2.255.109.145 1.536 2.345 3.722 3.289 1.52.656 2.112.526 2.493.493.424-.037 1.291-.527 1.473-1.036.182-.509.182-.945.127-1.036-.055-.091-.2-.145-.418-.255z"/>
+            </svg>
         </div>
+        
+        <h2>DASHBOARD CONNECT</h2>
+        <p>Paste your Cloudflared URL from Termux</p>
+
+        <div class="input-group">
+            <label>SERVER URL</label>
+            <input type="text" id="urlInput" placeholder="https://xxxx.trycloudflare.com">
+        </div>
+
+        <button class="btn-launch" onclick="launchDashboard()">CONNECT NOW</button>
+        <button class="btn-clear" onclick="clearData()">Clear Saved URL</button>
     </div>
 
-    <!-- SCREEN 2: THE APP -->
-    <iframe id="app-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
-
-    <!-- TOMBOL RESET (Ganti Link) -->
-    <div id="reset-btn" onclick="resetConfig()" title="Change URL">X</div>
-
     <script>
-        const STORAGE_KEY = 'cyber_monitor_url';
+        const STORAGE_KEY = 'cyber_monitor_link';
+        const inputField = document.getElementById('urlInput');
 
-        // Cek apakah sudah ada URL tersimpan saat loading
+        // Saat halaman dibuka, cek apakah ada link tersimpan
         window.onload = () => {
-            const savedUrl = localStorage.getItem(STORAGE_KEY);
-            if (savedUrl) {
-                launchFrame(savedUrl);
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                inputField.value = saved;
             }
         };
 
-        function saveAndLaunch() {
-            const input = document.getElementById('urlInput');
-            let url = input.value.trim();
-            
+        function launchDashboard() {
+            let url = inputField.value.trim();
+
             if (!url) {
-                document.getElementById('errorMsg').innerText = "URL cannot be empty";
+                alert("Please enter the Cloudflare URL!");
                 return;
             }
 
-            // Validasi format URL sederhana
+            // Validasi: pastikan ada https://
             if (!url.startsWith('http')) {
                 url = 'https://' + url;
             }
 
-            // Simpan ke storage & Jalankan
+            // Simpan ke memori HP
             localStorage.setItem(STORAGE_KEY, url);
-            launchFrame(url);
+
+            // REDIRECT (Pindah Halaman)
+            // Ini kuncinya: kita tidak pakai iframe, tapi pindah total
+            window.location.href = url;
         }
 
-        function launchFrame(url) {
-            // Sembunyikan setup, munculkan iframe
-            document.getElementById('setup-screen').style.display = 'none';
-            const frame = document.getElementById('app-frame');
-            const resetBtn = document.getElementById('reset-btn');
-
-            frame.src = url;
-            frame.style.display = 'block';
-            resetBtn.style.display = 'flex';
-
-            // Handle jika iframe gagal load (opsional, karena cross-origin susah dideteksi)
-            frame.onerror = () => {
-                alert("Failed to load. Please check the URL.");
-                resetConfig();
-            };
-        }
-
-        function resetConfig() {
+        function clearData() {
             localStorage.removeItem(STORAGE_KEY);
-            location.reload();
+            inputField.value = '';
         }
     </script>
 </body>

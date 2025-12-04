@@ -3,301 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WA • Cyber Monitor</title>
-    <!-- Pastikan file style.css berada di folder yang sama -->
-    <link rel="stylesheet" href="style.css">
+    <title>Connect • Cyber Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050b14;
+            --wa-green: #25D366;
+            --border: 1px solid rgba(37, 211, 102, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* TAMPILAN SETUP (INPUT LINK) */
+        #setup-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: radial-gradient(circleAt center, #111 0%, #000 100%);
+            z-index: 10;
+        }
+
+        .card {
+            background: #0a141f;
+            border: var(--border);
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(37, 211, 102, 0.1);
+        }
+
+        .logo { font-family: 'JetBrains Mono'; font-size: 40px; margin-bottom: 20px; }
+        .logo span { color: var(--wa-green); }
+
+        p { color: #888; font-size: 14px; margin-bottom: 20px; font-family: 'JetBrains Mono'; }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            background: #000;
+            border: 1px solid #333;
+            color: var(--wa-green);
+            font-family: 'JetBrains Mono';
+            margin-bottom: 15px;
+            outline: none;
+            text-align: center;
+        }
+        
+        input:focus { border-color: var(--wa-green); }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: var(--wa-green);
+            color: #000;
+            border: none;
+            font-weight: bold;
+            font-family: 'Rajdhani';
+            font-size: 16px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        /* TAMPILAN UTAMA (IFRAME) */
+        #app-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none; /* Hidden by default */
+        }
+
+        /* TOMBOL RESET MENGAMBANG */
+        #reset-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid red;
+            color: red;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+    </style>
 </head>
 <body>
 
-    <header class="top-bar">
-        <div class="logo-area"><span>⚡</span> CYBER MON</div>
-        <div class="time-display" id="clock">00:00</div>
-    </header>
-
-    <div class="container">
-        <!-- STATS BAR -->
-        <div class="stats-bar">
-            <div class="stat-box">
-                <span class="label">TOTAL</span>
-                <span class="value" id="statTotal">0</span>
-            </div>
-            <div class="stat-box online">
-                <span class="label">ONLINE</span>
-                <span class="value" id="statActive">0</span>
-            </div>
-            <div class="stat-box offline">
-                <span class="label">OFFLINE</span>
-                <span class="value" id="statOffline">0</span>
-            </div>
-            <div class="stat-box">
-                <span class="label">UPTIME</span>
-                <span class="value" style="font-size:14px" id="statUptime">0h</span>
-            </div>
-        </div>
-
-        <!-- MAIN CONTROLS -->
-        <div class="main-controls">
-            <button class="btn btn-green" onclick="openAddModal()">+ ADD BOT</button>
-            <button class="btn btn-blue" onclick="startAll()">ALL ON</button>
-            <button class="btn btn-red" onclick="stopAll()">ALL OFF</button>
-        </div>
-
-        <!-- BOT LIST -->
-        <div class="section-title">> SESSION LIST</div>
-        <div class="bot-grid" id="botGrid">
-            <!-- Bot cards will be injected here -->
-        </div>
-
-        <!-- TERMINAL LOGS -->
-        <div class="section-title">> TERMINAL LOGS</div>
-        <div class="terminal-container">
-            <div class="terminal-header">
-                <div class="terminal-title" id="termTitle">NO SESSION SELECTED</div>
-                <div class="terminal-actions" id="termActions" style="display:none">
-                    <button onclick="controlBot('start')">START</button>
-                    <button onclick="controlBot('stop')">STOP</button>
-                    <button class="del" onclick="controlBot('delete')">DEL</button>
-                </div>
-            </div>
-            <div class="terminal-logs" id="terminalLogs">
-                <div style="text-align:center; padding-top:100px; color:#555;">
-                    SELECT A BOT ABOVE<br>TO VIEW LOGS
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ADD MODAL -->
-    <div class="modal" id="addModal">
-        <div class="modal-box">
-            <h3 style="color:var(--text-main)">NEW TARGET</h3>
+    <!-- SCREEN 1: INPUT LINK -->
+    <div id="setup-screen">
+        <div class="card">
+            <div class="logo"><span>⚡</span> CONNECT</div>
+            <p>Paste your Cloudflare Tunnel URL here to launch the Dashboard.</p>
             
-            <!-- STEP 1: INPUT NOMOR -->
-            <div id="step1">
-                <input type="number" class="input-cyber" id="phoneInput" placeholder="Ex: 0812xxx / 62812xxx">
-                <div style="display:flex; gap:10px;">
-                    <button class="btn btn-red" onclick="closeAddModal()">CANCEL</button>
-                    <button class="btn btn-green" onclick="submitAddBot()">GET CODE</button>
-                </div>
-            </div>
-
-            <!-- STEP 2: TAMPIL KODE -->
-            <div id="step2" class="hidden" style="text-align:center;">
-                <p style="color:var(--cyan); font-size:12px; margin-top:10px;">PAIRING CODE:</p>
-                <!-- Area Kode -->
-                <div id="pairingCodeDisplay" style="font-size:28px; font-weight:bold; color:var(--wa-green); margin:15px 0; letter-spacing:3px; font-family:'JetBrains Mono'">
-                    WAITING...
-                </div>
-                <button class="btn btn-red" style="width:100%" onclick="closeAddModal()">CLOSE</button>
-            </div>
+            <input type="text" id="urlInput" placeholder="https://xxxx-xxxx.trycloudflare.com">
+            <button onclick="saveAndLaunch()">LAUNCH SYSTEM</button>
+            <div id="errorMsg" style="color:red; font-size:12px; margin-top:10px; font-family:'JetBrains Mono'"></div>
         </div>
     </div>
+
+    <!-- SCREEN 2: THE APP -->
+    <iframe id="app-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
+
+    <!-- TOMBOL RESET (Ganti Link) -->
+    <div id="reset-btn" onclick="resetConfig()" title="Change URL">X</div>
 
     <script>
-        let selectedSession = null;
-        let lastData = null;
-        const startTime = Date.now();
-        let pairingInterval = null;
+        const STORAGE_KEY = 'cyber_monitor_url';
 
-        // --- CLOCK & UPTIME ---
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour12: false, hour:'2-digit', minute:'2-digit'});
-            const diff = Math.floor((Date.now() - startTime) / 1000);
-            const h = Math.floor(diff/3600);
-            const m = Math.floor((diff%3600)/60);
-            document.getElementById('statUptime').innerText = `${h}h ${m}m`;
-        }, 1000);
-
-        // --- CORE FUNCTIONS ---
-        async function fetchStatus() {
-            try {
-                const res = await fetch('/api/status');
-                const data = await res.json();
-                lastData = data;
-                renderUI(data);
-            } catch (e) {
-                console.error("Connection Lost", e);
+        // Cek apakah sudah ada URL tersimpan saat loading
+        window.onload = () => {
+            const savedUrl = localStorage.getItem(STORAGE_KEY);
+            if (savedUrl) {
+                launchFrame(savedUrl);
             }
-        }
+        };
 
-        function renderUI(data) {
-            // Update Stats
-            document.getElementById('statTotal').innerText = data.sessions.length;
-            document.getElementById('statActive').innerText = data.activeBots.length;
-            document.getElementById('statOffline').innerText = data.sessions.length - data.activeBots.length;
-
-            // Update Grid
-            const grid = document.getElementById('botGrid');
-            const currentHTML = data.sessions.map(s => {
-                const isActive = data.activeBots.includes(s);
-                const isSelected = selectedSession === s ? 'active' : '';
-                return `
-                    <div class="bot-card ${isActive ? 'online' : 'offline'} ${isSelected}" onclick="selectBot('${s}')">
-                        <h3>+${s}</h3>
-                        <span>${isActive ? 'ONLINE' : 'OFFLINE'}</span>
-                    </div>
-                `;
-            }).join('');
+        function saveAndLaunch() {
+            const input = document.getElementById('urlInput');
+            let url = input.value.trim();
             
-            if (grid.innerHTML !== currentHTML) grid.innerHTML = currentHTML;
-
-            // Update Logs
-            updateTerminal(data);
-        }
-
-        function updateTerminal(data) {
-            if (!selectedSession) return;
-            
-            document.getElementById('termTitle').innerText = `ROOT@${selectedSession}`;
-            document.getElementById('termActions').style.display = 'block';
-
-            // Safety check jika logs undefined
-            const logs = (data.logs && data.logs[selectedSession]) ? data.logs[selectedSession] : [];
-            const logContainer = document.getElementById('terminalLogs');
-            
-            if (logs.length === 0) {
-                logContainer.innerHTML = '<div style="padding:10px; color:#555">No logs yet...</div>';
+            if (!url) {
+                document.getElementById('errorMsg').innerText = "URL cannot be empty";
                 return;
             }
 
-            const html = logs.map(l => `
-                <div class="log-entry ${l.type}">
-                    <span class="log-time">[${l.time}]</span>
-                    <span class="log-msg">${l.msg}</span>
-                </div>
-            `).join('');
-
-            // Auto scroll logic
-            const shouldScroll = logContainer.scrollTop + logContainer.clientHeight >= logContainer.scrollHeight - 50;
-            
-            if (logContainer.innerHTML !== html) {
-                logContainer.innerHTML = html;
-                if (shouldScroll) logContainer.scrollTop = logContainer.scrollHeight;
-            }
-        }
-
-        function selectBot(session) {
-            selectedSession = session;
-            if (lastData) renderUI(lastData);
-            // Scroll ke terminal (UX Improvement untuk HP)
-            document.querySelector('.terminal-container').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        async function controlBot(action) {
-            if (!selectedSession) return;
-            
-            // UI Feedback instan
-            const logContainer = document.getElementById('terminalLogs');
-            if (action === 'delete') {
-                logContainer.innerHTML = '<div style="text-align:center; padding-top:100px; color:#red;">DELETING...</div>';
+            // Validasi format URL sederhana
+            if (!url.startsWith('http')) {
+                url = 'https://' + url;
             }
 
-            await fetch(`/api/${action}/${selectedSession}`, { method: 'POST' });
-            
-            if (action === 'delete') {
-                selectedSession = null;
-                document.getElementById('terminalLogs').innerHTML = '<div style="text-align:center; padding-top:100px; color:#555;">DELETED</div>';
-                document.getElementById('termActions').style.display = 'none';
-                document.getElementById('termTitle').innerText = "NO SESSION SELECTED";
-            }
-            fetchStatus();
+            // Simpan ke storage & Jalankan
+            localStorage.setItem(STORAGE_KEY, url);
+            launchFrame(url);
         }
 
-        async function startAll() { 
-            await fetch('/api/start-all', { method: 'POST' }); 
-            fetchStatus(); 
-        }
-        
-        async function stopAll() { 
-            await fetch('/api/stop-all', { method: 'POST' }); 
-            fetchStatus(); 
-        }
+        function launchFrame(url) {
+            // Sembunyikan setup, munculkan iframe
+            document.getElementById('setup-screen').style.display = 'none';
+            const frame = document.getElementById('app-frame');
+            const resetBtn = document.getElementById('reset-btn');
 
-        // --- MODAL & PAIRING LOGIC ---
-        function openAddModal() { 
-            document.getElementById('addModal').style.display = 'flex'; 
-            document.getElementById('step1').classList.remove('hidden'); 
-            document.getElementById('step2').classList.add('hidden'); 
-            document.getElementById('pairingCodeDisplay').innerText = "WAITING...";
-            document.getElementById('phoneInput').value = '';
+            frame.src = url;
+            frame.style.display = 'block';
+            resetBtn.style.display = 'flex';
+
+            // Handle jika iframe gagal load (opsional, karena cross-origin susah dideteksi)
+            frame.onerror = () => {
+                alert("Failed to load. Please check the URL.");
+                resetConfig();
+            };
         }
 
-        function closeAddModal() { 
-            document.getElementById('addModal').style.display = 'none'; 
-            if(pairingInterval) clearInterval(pairingInterval); 
+        function resetConfig() {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
         }
-
-        async function submitAddBot() {
-            let phone = document.getElementById('phoneInput').value;
-            
-            // 1. Bersihkan nomor (Hapus spasi, strip, dll)
-            phone = phone.replace(/\D/g, ''); 
-
-            // 2. Validasi Input
-            if (!phone) {
-                alert('Nomor tidak boleh kosong!');
-                return;
-            }
-            
-            // Ubah tombol jadi Loading agar user tahu sedang proses
-            const btn = document.querySelector('#step1 .btn-green');
-            const originalText = btn.innerText;
-            btn.innerText = "PROSES...";
-            btn.disabled = true;
-
-            try {
-                // 3. Kirim ke Server
-                const res = await fetch('/api/add', { 
-                    method: 'POST', 
-                    body: JSON.stringify({ phone }),
-                    headers: { 'Content-Type': 'application/json' } // Penting!
-                });
-                
-                // Cek jika server error (misal 404 atau 500)
-                if (!res.ok) throw new Error("Gagal menghubungi server");
-
-                const data = await res.json();
-
-                if (data.success) {
-                    document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
-                    
-                    // Mulai Cek Kode
-                    let attempts = 0;
-                    pairingInterval = setInterval(async () => {
-                        attempts++;
-                        try {
-                            const cRes = await fetch('/api/pairing-code/' + data.phone);
-                            const cData = await cRes.json();
-                            
-                            if (cData.code && cData.code !== 'WAITING') {
-                                document.getElementById('pairingCodeDisplay').innerText = cData.code === 'CONNECTED' ? 'BERHASIL' : cData.code;
-                                if(cData.code === 'CONNECTED') { 
-                                    clearInterval(pairingInterval); 
-                                    setTimeout(closeAddModal, 2000); 
-                                    fetchStatus(); 
-                                }
-                            }
-                        } catch (err) {
-                            console.log("Menunggu kode...");
-                        }
-                    }, 2000);
-                } else {
-                    alert('Gagal: ' + data.message);
-                }
-            } catch (e) {
-                alert('Error: Pastikan Server (node server.js) sudah jalan!');
-                console.error(e);
-            } finally {
-                // Kembalikan tombol seperti semula
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        }
-
-        // --- INIT ---
-        fetchStatus();
-        setInterval(fetchStatus, 2000);
     </script>
 </body>
 </html>

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0b141a">
+    <!-- Mengatasi Mixed Content jika target HTTP -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <title>WhatsApp Panel Launcher</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
@@ -25,7 +27,7 @@
             background-color: var(--wa-dark);
             color: var(--wa-text);
             font-family: 'Inter', sans-serif;
-            overflow: hidden; /* Mencegah scroll ganda */
+            overflow: hidden; /* PENTING: Mencegah double scrollbar */
         }
 
         /* --- LOADER SCREEN STYLES --- */
@@ -35,7 +37,7 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
             padding: 30px;
-            z-index: 9999; /* Pastikan di atas iframe */
+            z-index: 9999;
             transition: opacity 0.8s ease, visibility 0.8s;
         }
 
@@ -88,22 +90,28 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.8s ease-out forwards; }
 
-        /* --- IFRAME STYLES --- */
+        /* --- IFRAME STYLES UPDATED --- */
         #content-frame {
             position: absolute; top: 0; left: 0;
             width: 100%; height: 100%;
             border: none;
             display: block;
-            background: #fff; /* Background sementara saat iframe loading */
+            background: #0b141a; /* Samakan background agar tidak flash putih */
         }
     </style>
 </head>
 <body>
 
-    <!-- IFRAME CONTAINER (URL ASLI AKAN DIMUAT DISINI) -->
-    <iframe id="content-frame" title="WhatsApp Bot Panel" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation"></iframe>
+    <!-- IFRAME DENGAN FULL PERMISSIONS -->
+    <iframe 
+        id="content-frame" 
+        src=""
+        title="WhatsApp Bot Panel"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; camera; microphone"
+        allowfullscreen
+    ></iframe>
 
-    <!-- LOADER OVERLAY (MENUTUPI IFRAME SAAT LOADING) -->
+    <!-- LOADER OVERLAY -->
     <div id="loader-screen">
         <div class="avatar-wrapper fade-in">
             <div class="avatar-ring"></div>
@@ -113,11 +121,11 @@
         </div>
 
         <h1 class="fade-in" style="animation-delay: 0.1s">WhatsApp Panel</h1>
-        <p class="subtitle fade-in" style="animation-delay: 0.2s">Membuka antarmuka panel...</p>
+        <p class="subtitle fade-in" style="animation-delay: 0.2s">Menghubungkan ke Cloudflare...</p>
 
         <div class="status-pill fade-in" style="animation-delay: 0.3s">
             <span class="dot" id="status-dot"></span>
-            <span id="status">MENGAMBIL DATA SERVER...</span>
+            <span id="status">MENGAMBIL DATA...</span>
         </div>
 
         <div class="progress-container fade-in" style="animation-delay: 0.4s">
@@ -163,12 +171,11 @@
                 pfill.style.width = "70%";
                 statusText.innerText = "MEMUAT ANTARMUKA...";
                 
-                // Set URL ke iframe tanpa mengubah URL browser utama
+                // Set URL ke iframe
                 iframe.src = targetUrl;
 
-                // TAHAP 3: Tunggu Iframe Loading (Opsional: Deteksi load)
-                // Kita beri delay sedikit agar animasi mulus, karena iframe 'load' event kadang tricky cross-origin
-                
+                // TAHAP 3: Selesai
+                // Delay agar iframe punya waktu render awal
                 setTimeout(() => {
                     pfill.style.width = "100%";
                     statusText.innerText = "SIAP!";
@@ -177,9 +184,9 @@
                     setTimeout(() => {
                         loader.style.opacity = '0';
                         loader.style.visibility = 'hidden';
-                    }, 500);
+                    }, 800);
                     
-                }, 2000); // Estimasi waktu load 2 detik
+                }, 2500);
 
             } catch (e) {
                 console.error(e);
@@ -187,13 +194,13 @@
                 pfill.style.background = "#ef5350";
                 statusDot.classList.remove('active');
                 statusDot.classList.add('error');
-                statusText.innerText = "GAGAL MEMUAT";
+                statusText.innerText = "SERVER OFFLINE";
                 statusText.style.color = "#ef5350";
                 
-                document.querySelector('.subtitle').innerText = "Mencoba refresh halaman...";
+                document.querySelector('.subtitle').innerText = "Gagal memuat iframe...";
                 
                 setTimeout(() => {
-                    window.location.reload();
+                   // window.location.reload(); // Opsional: reload otomatis
                 }, 3000);
             }
         }

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cyber Dashboard Launcher</title>
+    <title>WhatsApp Panel Launcher</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body, html { 
             margin: 0; padding: 0; height: 100%; overflow: hidden; 
-            background: #050b14; color: #25D366; 
+            background: #229953; color: #25D366; 
             font-family: 'JetBrains Mono', monospace; 
         }
         
@@ -44,9 +44,9 @@
 <body>
 
     <div id="loading">
-        <div class="logo">⚡</div>
+        <div class="logo">⚠️</div>
         <div class="spinner"></div>
-        <div class="status-text blink" id="status">CONNECTING TO TERMUX...</div>
+        <div class="status-text blink" id="status">MEMUAT DATA...</div>
         <div class="progress-bar"><div class="progress-fill" id="pfill"></div></div>
     </div>
 
@@ -67,7 +67,7 @@
             try {
                 // 1. Tanya Database: "Mana Link Termux Sekarang?"
                 pfill.style.width = "30%";
-                status.innerText = "FETCHING SECURE LINK...";
+                status.innerText = "DATA DIMUAT...";
                 
                 const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: { 'X-Master-Key': API_KEY }
@@ -84,8 +84,8 @@
                 }
 
                 // 2. Link Ketemu!
-                pfill.style.width = "70%";
-                status.innerText = "TARGET FOUND. REDIRECTING...";
+                pfill.style.width = "60%";
+                status.innerText = "SELESAI";
                 
                 // 3. Pindah Halaman Otomatis ke Link Cloudflare/Termux
                 pfill.style.width = "100%";

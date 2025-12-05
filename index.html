@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0b141a">
-    <title>WhatsApp Bot Connect</title>
-    <!-- Fonts: Poppins untuk Headings, Inter untuk UI -->
+    <title>WhatsApp Panel Launcher</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
     <style>
@@ -22,174 +21,103 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body, html { 
-            margin: 0; padding: 0; height: 100%; 
+            margin: 0; padding: 0; height: 100%; width: 100%;
             background-color: var(--wa-dark);
             color: var(--wa-text);
             font-family: 'Inter', sans-serif;
-            overflow: hidden;
+            overflow: hidden; /* Mencegah scroll ganda */
+        }
+
+        /* --- LOADER SCREEN STYLES --- */
+        #loader-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--wa-dark);
             display: flex; flex-direction: column;
-        }
-
-        /* Background Pattern (Optional WA Doodle effect subtle) */
-        body::before {
-            content: "";
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
-            opacity: 0.06;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        /* Main Container - One UI Style (Bottom focused or Centered Card) */
-        .container {
-            position: relative;
-            z-index: 1;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            align-items: center; justify-content: center;
             padding: 30px;
+            z-index: 9999; /* Pastikan di atas iframe */
+            transition: opacity 0.8s ease, visibility 0.8s;
         }
 
-        /* Avatar Container */
-        .avatar-wrapper {
-            position: relative;
-            margin-bottom: 25px;
+        #loader-screen::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
+            opacity: 0.06; pointer-events: none; z-index: -1;
         }
 
+        .avatar-wrapper { position: relative; margin-bottom: 25px; }
         .avatar-ring {
-            width: 110px; height: 110px;
-            border-radius: 50%;
+            width: 110px; height: 110px; border-radius: 50%;
             border: 3px solid var(--wa-teal);
-            position: absolute;
-            top: -5px; left: -5px;
-            animation: pulse-ring 2s infinite;
-            opacity: 0;
+            position: absolute; top: -5px; left: -5px;
+            animation: pulse-ring 2s infinite; opacity: 0;
         }
-
         .avatar {
-            width: 100px; height: 100px;
-            border-radius: 50%;
-            background: #fff;
-            padding: 2px;
+            width: 100px; height: 100px; border-radius: 50%;
+            background: #fff; padding: 2px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            z-index: 2;
-            position: relative;
+            z-index: 2; position: relative;
         }
-        
-        .avatar img {
-            width: 100%; height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-        }
+        .avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 
-        /* Typography */
-        h1 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 24px;
-            margin: 0 0 8px 0;
-            font-weight: 600;
-            letter-spacing: -0.5px;
-        }
+        h1 { font-family: 'Poppins', sans-serif; font-size: 24px; margin: 0 0 8px 0; font-weight: 600; letter-spacing: -0.5px; }
+        p.subtitle { font-size: 14px; color: var(--wa-subtext); margin: 0 0 40px 0; text-align: center; }
 
-        p.subtitle {
-            font-size: 14px;
-            color: var(--wa-subtext);
-            margin: 0 0 40px 0;
-            text-align: center;
-        }
-
-        /* Status Pill */
         .status-pill {
-            background: var(--wa-card);
-            padding: 10px 24px;
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            transition: all 0.3s ease;
+            background: var(--wa-card); padding: 10px 24px; border-radius: 50px;
+            font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px;
+            margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             border: 1px solid rgba(255,255,255,0.05);
         }
-
-        .dot {
-            width: 8px; height: 8px;
-            background-color: var(--wa-subtext);
-            border-radius: 50%;
-            transition: background-color 0.3s;
-        }
-
+        .dot { width: 8px; height: 8px; background-color: var(--wa-subtext); border-radius: 50%; transition: 0.3s; }
         .dot.active { background-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
         .dot.error { background-color: var(--danger); box-shadow: 0 0 10px var(--danger); }
 
-        /* Progress Bar (One UI Slider Style) */
         .progress-container {
-            width: 100%;
-            max-width: 280px;
-            height: 6px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
+            width: 100%; max-width: 280px; height: 6px;
+            background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;
         }
-
         .progress-fill {
-            height: 100%;
-            width: 0%;
+            height: 100%; width: 0%;
             background: linear-gradient(90deg, var(--wa-teal), var(--accent));
-            border-radius: 10px;
-            transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            border-radius: 10px; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
         }
+        .footer { position: absolute; bottom: 30px; font-size: 11px; color: var(--wa-subtext); opacity: 0.6; }
 
-        /* Footer Info */
-        .footer {
-            position: absolute;
-            bottom: 30px;
-            font-size: 11px;
-            color: var(--wa-subtext);
-            opacity: 0.6;
-        }
-
-        /* Animations */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); opacity: 0.5; border-color: var(--accent); }
-            100% { transform: scale(1.3); opacity: 0; border-color: var(--wa-teal); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; border-color: var(--accent); } 100% { transform: scale(1.3); opacity: 0; border-color: var(--wa-teal); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-in { animation: fadeIn 0.8s ease-out forwards; }
 
+        /* --- IFRAME STYLES --- */
+        #content-frame {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none;
+            display: block;
+            background: #fff; /* Background sementara saat iframe loading */
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        
-        <!-- Avatar Section -->
+    <!-- IFRAME CONTAINER (URL ASLI AKAN DIMUAT DISINI) -->
+    <iframe id="content-frame" title="WhatsApp Bot Panel" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-top-navigation-by-user-activation"></iframe>
+
+    <!-- LOADER OVERLAY (MENUTUPI IFRAME SAAT LOADING) -->
+    <div id="loader-screen">
         <div class="avatar-wrapper fade-in">
             <div class="avatar-ring"></div>
             <div class="avatar">
-                <!-- Ganti URL gambar di bawah ini dengan foto bot/logo WA -->
                 <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/WhatsApp.svg/2044px-WhatsApp.svg.png" alt="Bot Avatar">
             </div>
         </div>
 
-        <!-- Text Section -->
         <h1 class="fade-in" style="animation-delay: 0.1s">WhatsApp Panel</h1>
-        <p class="subtitle fade-in" style="animation-delay: 0.2s">Membuat koneksi aman ke server...</p>
+        <p class="subtitle fade-in" style="animation-delay: 0.2s">Membuka antarmuka panel...</p>
 
-        <!-- Status & Progress -->
         <div class="status-pill fade-in" style="animation-delay: 0.3s">
             <span class="dot" id="status-dot"></span>
-            <span id="status">MENGINISIALISASI...</span>
+            <span id="status">MENGAMBIL DATA SERVER...</span>
         </div>
 
         <div class="progress-container fade-in" style="animation-delay: 0.4s">
@@ -197,7 +125,6 @@
         </div>
 
         <div class="footer">Powered by WhatsApp Web API</div>
-
     </div>
 
     <script>
@@ -208,23 +135,20 @@
         // ==========================================
 
         async function connect() {
+            const loader = document.getElementById('loader-screen');
+            const iframe = document.getElementById('content-frame');
             const statusText = document.getElementById('status');
             const statusDot = document.getElementById('status-dot');
             const pfill = document.getElementById('pfill');
             
             try {
-                // TAHAP 1: Memulai Request
-                pfill.style.width = "20%";
-                statusDot.classList.add('active'); // Warna hijau
-                statusText.innerText = "MENCARI SESI...";
+                // TAHAP 1: Request Data
+                pfill.style.width = "30%";
+                statusDot.classList.add('active');
                 
-                // Fetch Data
                 const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: { 'X-Master-Key': API_KEY }
                 });
-                
-                // Simulasi delay sedikit agar animasi progress bar terlihat smooth
-                pfill.style.width = "50%";
                 
                 if (!res.ok) throw new Error("Database Error");
                 
@@ -235,36 +159,42 @@
                     throw new Error("No URL Found");
                 }
 
-                // TAHAP 2: Sukses
-                pfill.style.width = "85%";
-                statusText.innerText = "MENYAMBUNGKAN...";
+                // TAHAP 2: Set Iframe Source
+                pfill.style.width = "70%";
+                statusText.innerText = "MEMUAT ANTARMUKA...";
                 
-                // TAHAP 3: Redirect
+                // Set URL ke iframe tanpa mengubah URL browser utama
+                iframe.src = targetUrl;
+
+                // TAHAP 3: Tunggu Iframe Loading (Opsional: Deteksi load)
+                // Kita beri delay sedikit agar animasi mulus, karena iframe 'load' event kadang tricky cross-origin
+                
                 setTimeout(() => {
                     pfill.style.width = "100%";
-                    statusText.innerText = "BERHASIL!";
-                    window.location.href = targetUrl;
-                }, 800);
+                    statusText.innerText = "SIAP!";
+                    
+                    // Hilangkan Loader Screen
+                    setTimeout(() => {
+                        loader.style.opacity = '0';
+                        loader.style.visibility = 'hidden';
+                    }, 500);
+                    
+                }, 2000); // Estimasi waktu load 2 detik
 
             } catch (e) {
-                // TAHAP ERROR / FALLBACK
                 console.error(e);
-                
                 pfill.style.width = "100%";
-                pfill.style.background = "#ef5350"; // Warna merah
-                
+                pfill.style.background = "#ef5350";
                 statusDot.classList.remove('active');
-                statusDot.classList.add('error'); // Dot jadi merah
-                
-                statusText.innerText = "KONEKSI TERPUTUS";
+                statusDot.classList.add('error');
+                statusText.innerText = "GAGAL MEMUAT";
                 statusText.style.color = "#ef5350";
                 
-                // Update subtitle agar user tau apa yang terjadi
-                document.querySelector('.subtitle').innerText = "Mengalihkan ke server utama...";
-
+                document.querySelector('.subtitle').innerText = "Mencoba refresh halaman...";
+                
                 setTimeout(() => {
-                    window.location.href = MAIN_URL;
-                }, 2000);
+                    window.location.reload();
+                }, 3000);
             }
         }
 

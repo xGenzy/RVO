@@ -1,0 +1,28 @@
+name: Start WhatsApp Server
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '*/30 * * * *'  # Setiap 30 menit
+
+jobs:
+  start-server:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Start Server
+      run: node server.js &
+      
+    - name: Wait for URL
+      run: |
+        sleep 30
+        # Script untuk mendapatkan URL dan update JSONBin

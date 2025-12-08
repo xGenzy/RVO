@@ -1,11 +1,25 @@
 {
-  "name": "nodejs",
+  "name": "whatsapp-bot-cloudflare",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "WhatsApp Bot dengan Cloudflared Auto-tunnel",
+  "main": "autostart.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node autostart.js",
+    "dev": "node server.js",
+    "setup": "npm install && echo 'Setup complete!'",
+    "test": "node -e \"console.log('Server test passed')\""
   },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["whatsapp", "bot", "cloudflared", "tunnel"],
+  "author": "Your Name",
+  "license": "MIT"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",

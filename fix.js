@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = './server.js';
+const path = 'workspaces/RVO/server.js';
 
 // Baca file
 let content = fs.readFileSync(path, 'utf8');

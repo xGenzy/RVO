@@ -8,6 +8,163 @@ const path = require('path');
 const btch = require('btch-downloader'); // JANGAN LUPA: npm install btch-downloader
 
 // ====================================================
+// ⚙️ AUTO INSTALL DEPENDENCIES
+// ====================================================
+console.log('🔍 Checking dependencies...');
+
+const dependencies = {
+    'axios': 'latest',
+    'btch-downloader': 'latest'
+};
+
+async function installDependencies() {
+    const missingDeps = [];
+    
+    for (const [dep, version] of Object.entries(dependencies)) {
+        try {
+            require(dep);
+            console.log(`✅ ${dep} already installed`);
+        } catch (error) {
+            console.log(`📦 Installing ${dep}...`);
+            missingDeps.push(`${dep}@${version}`);
+        }
+    }
+    
+    if (missingDeps.length > 0) {
+        console.log(`📥 Installing: ${missingDeps.join(', ')}`);
+        
+        return new Promise((resolve, reject) => {
+            const npm = spawn('npm', ['install', ...missingDeps, '--no-audit', '--fund=false'], {
+                stdio: 'inherit',
+                shell: true
+            });
+            
+            npm.on('close', (code) => {
+                if (code === 0) {
+                    console.log('✅ Dependencies installed successfully');
+                    resolve();
+                } else {
+                    console.error('❌ Failed to install dependencies');
+                    reject(new Error('Installation failed'));
+                }
+            });
+        });
+    }
+    
+    return Promise.resolve();
+}
+
+// ====================================================
+// ⚙️ CHECK AND INSTALL CLOUDFLARED
+// ====================================================
+async function checkAndInstallCloudflared() {
+    return new Promise((resolve, reject) => {
+        exec('which cloudflared || command -v cloudflared', (error, stdout) => {
+            if (error || !stdout.trim()) {
+                console.log('🔍 Cloudflared not found, checking system...');
+                
+                // Check OS
+                const platform = os.platform();
+                const arch = os.arch();
+                
+                console.log(`💻 Platform: ${platform} ${arch}`);
+                
+                if (platform === 'android' || process.env.TERMUX_VERSION) {
+                    console.log('📦 Termux detected');
+                    console.log('Installing cloudflared for Termux...');
+                    
+                    const termuxInstall = spawn('pkg', ['install', 'cloudflared', '-y'], {
+                        stdio: 'inherit',
+                        shell: true
+                    });
+                    
+                    termuxInstall.on('close', (code) => {
+                        if (code === 0) {
+                            console.log('✅ Cloudflared installed successfully for Termux');
+                            resolve();
+                        } else {
+                            console.warn('⚠️ Failed to install via pkg, trying manual install...');
+                            installCloudflaredManually().then(resolve).catch(reject);
+                        }
+                    });
+                    
+                } else {
+                    installCloudflaredManually().then(resolve).catch(reject);
+                }
+            } else {
+                console.log(`✅ Cloudflared found at: ${stdout.trim()}`);
+                resolve();
+            }
+        });
+    });
+}
+
+async function installCloudflaredManually() {
+    return new Promise((resolve, reject) => {
+        console.log('⬇️ Downloading cloudflared...');
+        
+        let downloadUrl = '';
+        const platform = os.platform();
+        const arch = os.arch();
+        
+        // Determine download URL based on platform
+        if (platform === 'linux' && arch.includes('arm')) {
+            downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64';
+        } else if (platform === 'linux') {
+            downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64';
+        } else if (platform === 'darwin') {
+            downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz';
+        } else if (platform === 'win32') {
+            downloadUrl = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
+        } else {
+            return reject(new Error(`Unsupported platform: ${platform} ${arch}`));
+        }
+        
+        console.log(`📥 Downloading from: ${downloadUrl}`);
+        
+        // Use wget or curl to download
+        const downloadCmd = downloadUrl.includes('.exe') 
+            ? `curl -L -o cloudflared.exe "${downloadUrl}"`
+            : `curl -L -o cloudflared "${downloadUrl}"`;
+        
+        exec(downloadCmd, (error) => {
+            if (error) {
+                // Try wget as fallback
+                const fallbackCmd = downloadUrl.includes('.exe')
+                    ? `wget -O cloudflared.exe "${downloadUrl}"`
+                    : `wget -O cloudflared "${downloadUrl}"`;
+                
+                exec(fallbackCmd, (error2) => {
+                    if (error2) {
+                        console.error('❌ Failed to download cloudflared');
+                        console.log('\n📋 Manual installation required:');
+                        console.log('1. Download from: https://github.com/cloudflare/cloudflared/releases');
+                        console.log('2. Extract and place in current directory');
+                        console.log('3. Run: chmod +x cloudflared (Linux/Mac)');
+                        reject(new Error('Cloudflared download failed'));
+                    } else {
+                        makeExecutable();
+                        resolve();
+                    }
+                });
+            } else {
+                makeExecutable();
+                resolve();
+            }
+        });
+        
+        function makeExecutable() {
+            if (platform !== 'win32') {
+                exec('chmod +x cloudflared', (error) => {
+                    if (!error) {
+                        console.log('✅ Cloudflared made executable');
+                    }
+                });
+            }
+        }
+    });
+}
+// ====================================================
 // ⚙️ KONFIGURASI SERVER
 // ====================================================
 const BIN_ID = '693151eed0ea881f40121ca6'; 

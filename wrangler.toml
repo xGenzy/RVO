@@ -1,0 +1,13 @@
+wrangler.toml
+
+name = "whatsapp-bot-manager"
+main = "server.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+workers_dev = false
+
+[[routes]]
+pattern = "*"
+zone_name = "https://xgenzy.github.io/RVO/"
+custom_domain = true

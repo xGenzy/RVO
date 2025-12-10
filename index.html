@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WhatsApp Bot Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            /* === WHATSAPP THEME === */
+            --wa-primary: #128C7E;
+            --wa-primary-dark: #075E54;
+            --wa-secondary: #25D366;
+            --wa-light: #DCF8C6;
+            --bg-body: #f0f2f5;
+            --bg-card: #ffffff;
+            --text-pri: #111B21;
+            --text-sec: #667781;
+            --border: #e9edef;
+            --danger: #FF3B30;
+            --radius: 12px;
+            --shadow: 0 2px 8px rgba(11,20,26,0.15);
+        }
+
+        body.dark-mode {
+            --bg-body: #0d1418;
+            --bg-card: #1f2c33;
+            --text-pri: #e9edef;
+            --text-sec: #8696a0;
+            --border: #2a3942;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; outline: none; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-body); color: var(--text-pri); min-height: 100vh; transition: 0.3s; }
+
+        /* HEADER */
+        .header { background: linear-gradient(135deg, var(--wa-primary), var(--wa-primary-dark)); color: white; padding: 15px 20px; display: flex; justify-content: space-between; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .header-logo { font-weight: bold; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+        
+        /* FLOATING MENU */
+        .floating-menu-btn { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: var(--wa-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1001; cursor: pointer; border: none; transition: 0.3s; }
+        .floating-menu { position: fixed; bottom: 80px; right: 20px; background: var(--bg-card); border-radius: 12px; padding: 10px; display: none; flex-direction: column; gap: 5px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 1000; min-width: 180px; }
+        .floating-menu.active { display: flex; animation: slideUp 0.3s; }
+        .menu-item { padding: 12px; border-radius: 8px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-pri); transition: 0.2s; }
+        .menu-item:hover, .menu-item.active { background: rgba(18, 140, 126, 0.1); color: var(--wa-primary); }
+
+        /* CONTENT */
+        .main-content { padding: 15px; max-width: 800px; margin: 0 auto; padding-bottom: 100px; }
+        .view-section { display: none; animation: fadeIn 0.4s; }
+        .view-section.active { display: block; }
+        .card { background: var(--bg-card); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+        
+        /* ELEMENTS */
+        .btn { padding: 10px 15px; border-radius: 20px; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+        .btn-primary { background: var(--wa-primary); color: white; }
+        .btn-success { background: var(--wa-secondary); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--text-sec); color: var(--text-pri); }
+        .btn-block { width: 100%; justify-content: center; }
+        .form-input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-pri); margin-bottom: 15px; }
+        
+        /* MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: var(--bg-card); padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+
+        /* UTILS */
+        .d-none { display: none; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* SPECIFIC */
+        .bot-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border); }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; display: inline-block; margin-right: 5px; }
+        .status-online { background: #25D366; box-shadow: 0 0 5px #25D366; }
+        .pairing-code { font-family: monospace; font-size: 24px; letter-spacing: 5px; text-align: center; background: rgba(18, 140, 126, 0.1); padding: 15px; border-radius: 8px; color: var(--wa-primary); font-weight: bold; cursor: pointer; margin: 10px 0; }
+        
+        /* === NEW LOADING SCREEN (WHATSAPP STYLE) === */
+        #loadingOverlay { 
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: #ffffff; 
+            z-index: 9999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            transition: opacity 0.5s ease;
+        }
+        body.dark-mode #loadingOverlay { background: #111b21; }
+        
+        .wa-logo-wrapper {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+        
+        .wa-logo-icon {
+            font-size: 80px;
+            color: #25D366;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        
+        .loading-bar-container {
+            width: 150px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            width: 30%;
+            background: #25D366;
+            border-radius: 4px;
+            animation: loadingProgress 1.5s infinite ease-in-out;
+        }
+        
+        .loading-text {
+            color: var(--text-sec);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .meta-footer {
+            position: absolute;
+            bottom: 30px;
+            text-align: center;
+            color: #8696a0;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .meta-logo {
+            font-weight: bold;
+            font-size: 16px;
+            color: #25D366;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes loadingProgress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(300%); }
+        }
+        /* ... CSS sebelumnya ... */
+
+        /* === NEW LOADING SCREEN STYLES === */
+        #loadingOverlay { 
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background: #ffffff; 
+            z-index: 9999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            transition: opacity 0.5s ease;
+        }
+        body.dark-mode #loadingOverlay { background: #111b21; }
+        
+        .wa-logo-wrapper {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+        
+        .wa-logo-icon {
+            font-size: 80px;
+            color: #25D366;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        
+        .loading-bar-container {
+            width: 150px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            width: 30%;
+            background: #25D366;
+            border-radius: 4px;
+            animation: loadingProgress 1.5s infinite ease-in-out;
+        }
+        
+        .loading-text {
+            color: var(--text-sec);
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .loading-text.error {
+            color: var(--danger);
+            animation: shake 0.5s;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes loadingProgress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(300%); }
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- WHATSAPP STYLE LOADING SCREEN -->
+    <div id="loadingOverlay">
+        <div class="wa-logo-wrapper">
+            <i class="fab fa-whatsapp wa-logo-icon"></i>
+        </div>
+        <div class="loading-bar-container">
+            <div class="loading-bar"></div>
+        </div>
+        <p class="loading-text" id="loadingText">Menghubungkan...</p>
+        
+        <div class="meta-footer">
+            <span>from</span>
+            <span class="meta-logo"><i class="fab fa-meta"></i> Meta</span>
+        </div>
+    </div>
+
+    <!-- AUTH MODAL -->
+    <div class="modal-overlay active" id="authModal" style="display: none;">
+        <div class="modal-box">
+            <h2 style="text-align:center; margin-bottom:20px; color:var(--wa-primary)">Login Bot Manager</h2>
+            <input id="u" class="form-input" placeholder="Username" autocomplete="off">
+            <input type="password" id="p" class="form-input" placeholder="Password">
+            <button onclick="login()" class="btn btn-primary btn-block">MASUK</button>
+            <div style="margin-top:15px; text-align:center; font-size:13px;">
+                <span onclick="switchAuth('reg')" style="color:var(--wa-primary); cursor:pointer">Buat Akun</span> | 
+                <span onclick="switchAuth('reset')" style="color:var(--text-sec); cursor:pointer">Reset Password</span>
+            </div>
+            
+            <!-- REG FORM -->
+            <div id="regForm" class="d-none" style="margin-top:20px; border-top:1px solid var(--border); padding-top:15px;">
+                <h3>Daftar Baru</h3>
+                <input id="ru" class="form-input" placeholder="Username Baru" style="margin-top:10px">
+                <input type="password" id="rp" class="form-input" placeholder="Password Baru">
+                <button onclick="reg()" class="btn btn-success btn-block">DAFTAR</button>
+            </div>
+            
+             <!-- RESET FORM -->
+             <div id="resetForm" class="d-none" style="margin-top:20px; border-top:1px solid var(--border); padding-top:15px;">
+                <h3>Reset Password</h3>
+                <input id="rUser" class="form-input" placeholder="Username" style="margin-top:10px">
+                <input id="rPhone" class="form-input" placeholder="Nomor Bot (628xxx)">
+                <input type="password" id="rNewPass" class="form-input" placeholder="Password Baru">
+                <button onclick="resetPass()" class="btn btn-danger btn-block">RESET</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD BOT MODAL -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal-box">
+            <h3 style="margin-bottom:15px">Tambah WhatsApp</h3>
+            <div id="addStep1">
+                <input id="botPhone" type="tel" class="form-input" placeholder="Format: 628xxxxx">
+                <div style="display:flex; gap:10px">
+                    <button onclick="reqPair()" class="btn btn-success btn-block">Dapatkan Kode</button>
+                    <button onclick="closeModal('addModal')" class="btn btn-outline">Batal</button>
+                </div>
+            </div>
+            <div id="addStep2" class="d-none" style="text-align:center">
+                <p>Salin kode ini ke WhatsApp > Perangkat Tertaut:</p>
+                <div id="codeDisplay" class="pairing-code" onclick="copyCode()">...</div>
+                <div id="pairStatus" style="font-size:12px; color:var(--text-sec)">Menunggu...</div>
+                <button onclick="closeModal('addModal')" class="btn btn-outline btn-block" style="margin-top:15px">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="appContainer" class="d-none">
+        <div class="header">
+            <div class="header-logo"><i class="fab fa-whatsapp"></i> WA Manager</div>
+            <div>
+                <button class="btn btn-outline" style="color:white; border-color:white" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- DASHBOARD -->
+            <div id="view-dash" class="view-section active">
+                <div class="card">
+                    <h3>Status Server</h3>
+                    <p style="font-size:13px; color:var(--text-sec); word-break:break-all">
+                        <span id="connectionDot" style="color:green">●</span> <span id="apiUrlDisplay">Terhubung</span>
+                    </p>
+                    <div style="display:flex; justify-content:space-between; margin-top:15px">
+                        <div style="text-align:center">
+                            <h2 id="totalBots">0</h2><span style="font-size:12px">Total Bot</span>
+                        </div>
+                        <div style="text-align:center">
+                            <h2 id="activeBots" style="color:var(--wa-secondary)">0</h2><span style="font-size:12px">Aktif</span>
+                        </div>
+                        <div style="text-align:center">
+                            <h2 id="myBots">0</h2><span style="font-size:12px">Bot Saya</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                        <h3>Daftar Bot</h3>
+                        <button onclick="loadData()" class="btn btn-outline"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div id="botList"></div>
+                </div>
+            </div>
+
+            <!-- DOWNLOADER -->
+            <div id="view-dl" class="view-section">
+                <div class="card">
+                    <h3>Media Downloader</h3>
+                    <input id="dlUrl" class="form-input" placeholder="Link TikTok / IG / FB / YT..." style="margin-top:15px">
+                    <div style="display:flex; gap:10px">
+                        <button onclick="doDownload('mp4')" class="btn btn-primary" id="btnMp4">Video MP4</button>
+                        <button onclick="doDownload('mp3')" class="btn btn-success" id="btnMp3">Audio MP3</button>
+                    </div>
+                    <div id="dlResult" style="margin-top:15px; text-align:center"></div>
+                </div>
+            </div>
+
+            <!-- CHECK NUMBER -->
+            <div id="view-check" class="view-section">
+                <div class="card">
+                    <h3>Cek Nomor</h3>
+                    <input id="checkPhone" class="form-input" placeholder="628xxxx" style="margin-top:15px">
+                    <button onclick="doCheck()" class="btn btn-primary btn-block" id="btnCheck">Cek Sekarang</button>
+                    <div id="checkResult" style="margin-top:15px"></div>
+                </div>
+            </div>
+
+            <!-- PROFILE -->
+            <div id="view-profile" class="view-section">
+                <div class="card" style="text-align:center">
+                    <img id="p_img" src="" style="width:100px; height:100px; border-radius:50%; margin-bottom:10px">
+                    <h2 id="p_name">-</h2>
+                    <p id="p_role" style="color:var(--text-sec)">User</p>
+                    <hr style="border:0; border-top:1px solid var(--border); margin:15px 0">
+                    <div style="text-align:left">
+                        <p><strong>User ID:</strong> <span id="p_uid">-</span></p>
+                        <p><strong>Bergabung:</strong> <span id="p_join">-</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLOATING MENU -->
+        <button class="floating-menu-btn" onclick="toggleMenu()"><i class="fas fa-bars"></i></button>
+        <div class="floating-menu" id="floatingMenu">
+            <div class="menu-item active" onclick="view('dash')"><i class="fas fa-home"></i> Home</div>
+            <div class="menu-item" onclick="openModal('addModal')"><i class="fas fa-plus-circle"></i> Tambah Bot</div>
+            <div class="menu-item" onclick="view('dl')"><i class="fas fa-download"></i> Downloader</div>
+            <div class="menu-item" onclick="view('check')"><i class="fas fa-search"></i> Cek Nomor</div>
+            <div class="menu-item" onclick="view('profile')"><i class="fas fa-user"></i> Profil</div>
+            <div class="menu-item" onclick="toggleDarkMode()"><i class="fas fa-moon"></i> Tema Gelap</div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // KONFIGURASI (WAJIB DIGANTI)
+        // ==========================================
+        const BIN_ID = '693151eed0ea881f40121ca6'; 
+        const BIN_KEY = '$2a$10$u00Qvq6xrri32tc7bEYVhuQv94XS.ygeVCr70UDbzoOVlR8yLuUq.'; 
+        // ==========================================
+        
+        let API_URL = '';
+        let TOKEN = localStorage.getItem('auth_token');
+        let isConnected = false;
+        let isFirstLoad = true; // Penanda load awal untuk Splash Screen
+
+        // --- INIT ---
+        async function init() {
+            // Pastikan Splash Screen Muncul di Awal
+            const loader = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            
+            loader.style.display = 'flex';
+            loader.style.opacity = '1';
+            loadingText.innerText = "Menghubungkan...";
+            loadingText.classList.remove('error');
+
+            // 1. Cek Koneksi Awal
+            await checkConnectivity();
+
+            // 2. Jalankan Watcher (Cek berkala setiap 5 detik)
+            setInterval(checkConnectivity, 5000);
+        }
+
+        // --- CORE CONNECTIVITY LOGIC (HEARTBEAT) ---
+        async function checkConnectivity() {
+            const loader = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            const dot = document.getElementById('connectionDot');
+            const statusText = document.getElementById('apiUrlDisplay');
+
+            try {
+                // A. Ambil URL terbaru dari JSONBin
+                const jsonRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': BIN_KEY }
+                });
+                
+                if (!jsonRes.ok) throw new Error("JSONBin Error");
+                const data = await jsonRes.json();
+                const remoteUrl = data.record.url.trim().replace(/\/$/, "");
+
+                // Update URL Global
+                API_URL = remoteUrl;
+
+                // B. Coba PING ke Server Termux
+                // Mode: cors agar tidak diblokir browser, method GET ke root
+                const ping = await fetch(API_URL + '/', { method: 'GET', mode: 'cors' });
+                
+                if (ping.ok) {
+                    // === KONEKSI SUKSES ===
+                    if (!isConnected) {
+                        console.log("✅ Server Terhubung:", API_URL);
+                        isConnected = true;
+                        
+                        // Update UI Dashboard
+                        if(dot) {
+                            dot.style.color = "#25D366";
+                            dot.style.textShadow = "0 0 5px #25D366";
+                            statusText.innerText = "Online";
+                            statusText.style.color = "var(--text-pri)";
+                        }
+
+                        // HILANGKAN SPLASH SCREEN (Jika ini load awal/recovery)
+                        if (isFirstLoad) {
+                            loadingText.innerText = "Terhubung!";
+                            loadingText.classList.remove('error');
+                            
+                            // Cek Login Otomatis sebelum menutup Splash Screen
+                            checkAuthState(); 
+
+                            setTimeout(() => {
+                                loader.style.opacity = '0';
+                                setTimeout(() => { 
+                                    loader.style.display = 'none'; 
+                                    isFirstLoad = false; // Tandai sudah masuk
+                                }, 500);
+                            }, 800);
+                        } else {
+                            // Jika reconnecting di background, refresh data dashboard
+                            loadData();
+                        }
+                    }
+                } else {
+                    throw new Error("Server Error");
+                }
+
+            } catch (e) {
+                // === KONEKSI GAGAL / OFFLINE ===
+                console.log("⚠️ Koneksi Terputus:", e.message);
+                isConnected = false;
+
+                if (isFirstLoad) {
+                    // Jika masih di Splash Screen, Ubah Teks jadi Merah & JANGAN HILANGKAN SPLASH
+                    loadingText.innerText = "Gangguan Server";
+                    loadingText.classList.add('error');
+                } else {
+                    // Jika sudah di Dashboard, update indikator kecil
+                    if(dot) {
+                        dot.style.color = "#FF3B30";
+                        dot.style.textShadow = "none";
+                        statusText.innerText = "Menghubungkan...";
+                        statusText.style.color = "#FF3B30";
+                    }
+                }
+            }
+        }
+
+        // --- MANAJEMEN AUTH & VIEW ---
+        function checkAuthState() {
+            const authModal = document.getElementById('authModal');
+            const appContainer = document.getElementById('appContainer');
+
+            // Cek apakah ada token tersimpan
+            if (TOKEN) {
+                // SUDAH LOGIN: Tampilkan Dashboard, Sembunyikan Modal Login
+                authModal.style.display = 'none';
+                appContainer.classList.remove('d-none');
+                loadData(); // Muat data bot
+            } else {
+                // BELUM LOGIN: Tampilkan Modal Login, Sembunyikan Dashboard
+                appContainer.classList.add('d-none');
+                authModal.style.display = 'flex';
+                authModal.style.pointerEvents = 'auto'; 
+            }
+        }
+
+        // --- FETCH WRAPPER ---
+        async function api(path, method = 'GET', body = null) {
+            if (!API_URL) return { success: false, message: 'Server URL Missing' };
+
+            const opts = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+            if (body) opts.body = JSON.stringify(body);
+
+            try {
+                const res = await fetch(API_URL + path, opts);
+                if (res.status === 401) {
+                    logout();
+                    return { success: false, message: 'Sesi habis.' };
+                }
+                return await res.json();
+            } catch (e) {
+                return { success: false, message: 'Koneksi Server Bermasalah' };
+            }
+        }
+
+        // --- AUTH ACTIONS ---
+        async function login() {
+            const btn = document.querySelector('#authModal .btn-primary');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            const u = document.getElementById('u').value;
+            const p = document.getElementById('p').value;
+            
+            if(!u || !p) { alert("Isi lengkap!"); btn.innerHTML = originalText; btn.disabled = false; return; }
+
+            // Pastikan koneksi aman sebelum request login
+            if (!isConnected) {
+                alert("Server Offline. Tunggu hingga indikator hijau.");
+                btn.innerHTML = originalText; btn.disabled = false;
+                return;
+            }
+
+            const res = await api('/api/login', 'POST', {user: u, pass: p});
+            
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            if (res.success) {
+                TOKEN = res.token;
+                localStorage.setItem('auth_token', TOKEN);
+                checkAuthState(); // Langsung pindah ke dashboard
+            } else {
+                alert(res.message);
+            }
+        }
+
+        async function reg() {
+            const u = document.getElementById('ru').value;
+            const p = document.getElementById('rp').value;
+            if(!u || !p) return alert("Isi lengkap!");
+            const res = await api('/api/register', 'POST', {user: u, pass: p});
+            if (res.success) { alert('Berhasil! Silakan login.'); switchAuth('login'); } else { alert(res.message); }
+        }
+        
+        async function resetPass() {
+            const u = document.getElementById('rUser').value;
+            const ph = document.getElementById('rPhone').value;
+            const np = document.getElementById('rNewPass').value;
+            if(!u || !ph || !np) return alert("Isi lengkap!");
+            const res = await api('/api/reset-password', 'POST', {user: u, phone: ph, newPass: np});
+            if (res.success) { alert('Berhasil reset!'); switchAuth('login'); } else { alert(res.message); }
+        }
+
+        function logout() { localStorage.removeItem('auth_token'); location.reload(); }
+
+        // --- DATA LOGIC ---
+        async function loadData() {
+            if (!isConnected) return; // Jangan load jika offline
+
+            const d = await api('/api/data');
+            if (!d || !d.user) return; 
+
+            document.getElementById('totalBots').innerText = d.sessions ? d.sessions.length : 0;
+            document.getElementById('activeBots').innerText = d.activeBots ? d.activeBots.length : 0;
+            
+            const list = document.getElementById('botList');
+            const scrollPos = list.scrollTop;
+            list.innerHTML = '';
+            
+            const mySessions = d.role === 'admin' ? d.sessions : d.sessions.filter(s => d.meta[s]?.owner === d.user);
+            document.getElementById('myBots').innerText = mySessions.length;
+
+            if(mySessions.length === 0) list.innerHTML = '<p style="text-align:center;color:#999;font-size:12px;padding:20px;">Belum ada bot terhubung.</p>';
+
+            mySessions.forEach(s => {
+                const isActive = d.activeBots.includes(s);
+                const meta = d.meta[s] || {};
+                const html = `
+                <div class="bot-item">
+                    <div>
+                        <div style="font-weight:bold; font-size:15px"><span class="status-dot ${isActive?'status-online':''}"></span> +${s}</div>
+                        <div style="font-size:11px; color:var(--text-sec)">Owner: ${meta.owner}</div>
+                    </div>
+                    <div style="display:flex; gap:5px">
+                        ${isActive 
+                            ? `<button onclick="action('${s}','stop')" class="btn btn-outline" style="padding:4px 8px"><i class="fas fa-stop"></i></button>
+                               <button onclick="action('${s}','restart')" class="btn btn-outline" style="padding:4px 8px"><i class="fas fa-redo"></i></button>`
+                            : `<button onclick="action('${s}','start')" class="btn btn-success" style="padding:4px 8px"><i class="fas fa-play"></i></button>`
+                        }
+                        ${d.role === 'admin' ? `<button onclick="action('${s}','delete')" class="btn btn-danger" style="padding:4px 8px"><i class="fas fa-trash"></i></button>` : ''}
+                    </div>
+                </div>`;
+                list.innerHTML += html;
+            });
+            
+            if (list.scrollTop) list.scrollTop = scrollPos;
+            if(document.getElementById('p_name').innerText === '-') loadProfile();
+        }
+
+        async function action(ph, act) {
+            if(act === 'delete' && !confirm('Yakin?')) return;
+            const res = await api(`/api/${act}/${ph}`, 'POST');
+            if(res.success) loadData(); else alert('Gagal: ' + (res.message || 'Error'));
+        }
+
+        // --- FEATURES ---
+        async function reqPair() {
+            const ph = document.getElementById('botPhone').value;
+            if(!ph) return alert('Isi nomor');
+            const res = await api('/api/add', 'POST', {phone: ph});
+            if(res.success) {
+                document.getElementById('addStep1').classList.add('d-none');
+                document.getElementById('addStep2').classList.remove('d-none');
+                pollCode(res.phone);
+            } else alert(res.message);
+        }
+
+        function pollCode(ph) {
+            const interval = setInterval(async () => {
+                const res = await api(`/api/code/${ph}`);
+                const el = document.getElementById('codeDisplay');
+                const st = document.getElementById('pairStatus');
+                
+                if(res.code) {
+                    if(res.code === 'CONNECTED') {
+                        el.innerText = "SUKSES!"; el.style.color = "green";
+                        clearInterval(interval);
+                        setTimeout(() => { closeModal('addModal'); loadData(); }, 2000);
+                    } else if (['WAITING','STARTING'].includes(res.code)) {
+                        el.innerText = "..."; st.innerText = "Menunggu server...";
+                    } else {
+                        el.innerText = res.code; st.innerText = "Ketuk untuk salin";
+                    }
+                }
+            }, 3000);
+        }
+
+        async function doDownload(type) {
+            const url = document.getElementById('dlUrl').value;
+            if(!url) return alert('Url kosong');
+            const btn = document.getElementById(type === 'mp4' ? 'btnMp4' : 'btnMp3');
+            const resDiv = document.getElementById('dlResult');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; resDiv.innerHTML = '';
+            
+            const res = await api('/api/download', 'POST', {url, type});
+            btn.innerHTML = type === 'mp4' ? 'Video' : 'Audio';
+            
+            if(res.success && res.data) {
+                const d = res.data;
+                resDiv.innerHTML = `<img src="${d.thumbnail}" style="width:100%;max-width:200px;border-radius:10px;margin-bottom:10px"><h4>${d.title}</h4><a href="${d.url}" target="_blank" class="btn btn-success" style="margin-top:10px">DOWNLOAD</a>`;
+            } else resDiv.innerHTML = '<p style="color:red">Gagal</p>';
+        }
+
+        async function doCheck() {
+            const ph = document.getElementById('checkPhone').value;
+            if(!ph) return alert('Nomor kosong');
+            const btn = document.getElementById('btnCheck');
+            const resDiv = document.getElementById('checkResult');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
+            btn.disabled = true;
+            res.innerHTML = ''; // Reset hasil sebelumnya
+            
+            const res = await api('/api/check-number', 'POST', {target: ph});
+            btn.innerHTML = '<i class="fas fa-search"></i> Cek Sekarang';
+            btn.disabled = false;
+            
+            if(res.success && res.data) {
+                const d = res.data;
+                resDiv.innerHTML = `<div class="card" style="text-align:left;border-left:4px solid var(--wa-primary)"><img src="${d.ppUrl}" style="width:60px;height:60px;border-radius:50%;float:left;margin-right:10px"><div><b>${d.name||'Unknown'}</b><br><small>${d.number}</small></div><div style="clear:both;padding-top:10px;font-size:15px"><p>• Bio: ${d.statusDate}</p><p>• Kategori: ${d.category}</p><p>• Alamat: ${d.address}</p><p>• Email: ${d.email}</p><p>• Website: ${d.website}</p></div></div>`;
+            } else resDiv.innerHTML = `<p style="color:red">${res.message}</p>`;
+        }
+        
+        async function loadProfile() {
+            if (!isConnected) return;
+            const res = await api('/api/profile');
+            if(res.name) {
+                document.getElementById('p_name').innerText = res.name;
+                document.getElementById('p_img').src = res.photoUrl;
+                document.getElementById('p_role').innerText = res.role.toUpperCase();
+                document.getElementById('p_uid').innerText = res.userId;
+                document.getElementById('p_join').innerText = res.joinDate;
+            }
+        }
+
+        // --- UI HELPERS ---
+        function view(v) { document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active')); document.getElementById('view-' + v).classList.add('active'); toggleMenu(); }
+        function toggleMenu() { const m = document.getElementById('floatingMenu'); const btn = document.querySelector('.floating-menu-btn i'); if(m.style.display === 'flex') { m.style.display = 'none'; btn.className = 'fas fa-bars'; } else { m.style.display = 'flex'; btn.className = 'fas fa-times'; } }
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function switchAuth(type) { document.getElementById('regForm').classList.add('d-none'); document.getElementById('resetForm').classList.add('d-none'); if(type === 'reg') document.getElementById('regForm').classList.remove('d-none'); if(type === 'reset') document.getElementById('resetForm').classList.remove('d-none'); }
+        function copyCode() { const t = document.getElementById('codeDisplay').innerText; if(t && t !== '...') navigator.clipboard.writeText(t).then(() => alert('Disalin!')); }
+        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+
+        window.onload = init;
+    </script>

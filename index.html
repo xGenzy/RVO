@@ -1663,6 +1663,80 @@
 
     <!-- NOTIFICATION -->
     <div class="notification" id="notification"></div>
+
+    <script>
+        // ================= CONFIG =================
+        const BIN_ID = '693151eed0ea881f40121ca6'; 
+        const API_KEY = '$2a$10$u00Qvq6xrri32tc7bEYVhuQv94XS.ygeVCr70UDbzoOVlR8yLuUq.'; 
+        const MAIN_URL = 'https://xgenzy.github.io/RVO/';
+        // ==========================================
+
+        async function connect() {
+            const statusText = document.getElementById('status');
+            const statusDot = document.getElementById('status-dot');
+            const pfill = document.getElementById('pfill');
+            
+            try {
+                // TAHAP 1: Memulai Request
+                pfill.style.width = "20%";
+                statusDot.classList.add('active'); // Warna hijau
+                statusText.innerText = "MENCARI SESI...";
+                
+                // Fetch Data
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY }
+                });
+                
+                // Simulasi delay sedikit agar animasi progress bar terlihat smooth
+                pfill.style.width = "50%";
+                
+                if (!res.ok) throw new Error("Database Error");
+                
+                const data = await res.json();
+                const targetUrl = data.record.url;
+
+                if (!targetUrl || targetUrl.trim() === "") {
+                    throw new Error("No URL Found");
+                }
+
+                // TAHAP 2: Sukses
+                pfill.style.width = "85%";
+                statusText.innerText = "MENYAMBUNGKAN...";
+                
+                // TAHAP 3: Redirect
+                setTimeout(() => {
+                    pfill.style.width = "100%";
+                    statusText.innerText = "CONNECTED!";
+                    window.location.href = targetUrl;
+                }, 800);
+
+            } catch (e) {
+                // TAHAP ERROR / FALLBACK
+                console.error(e);
+                
+                pfill.style.width = "100%";
+                pfill.style.background = "#ef5350"; // Warna merah
+                
+                statusDot.classList.remove('active');
+                statusDot.classList.add('error'); // Dot jadi merah
+                
+                statusText.innerText = "KONEKSI TERPUTUS";
+                statusText.style.color = "#ef5350";
+                
+                // Update subtitle agar user tau apa yang terjadi
+                document.querySelector('.subtitle').innerText = "Mengalihkan ke server utama...";
+
+                setTimeout(() => {
+                    window.location.href = MAIN_URL;
+                }, 2000);
+            }
+        }
+
+        window.onload = connect;
+    </script>
+</body>
+</html>
+
         
         let currentUser = null;
         let userProfile = null;
@@ -2460,6 +2534,8 @@
                 `;
             }
         }
+
+        
           
 
         // --- INITIALIZATION ---
